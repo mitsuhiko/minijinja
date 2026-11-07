@@ -47,6 +47,8 @@ All notable changes to MiniJinja are documented here.
 * Fixed repeating a string or sequence a negative number of times failing in Rust and Go.  Like in Python, `"foo" * -1` is now an empty string and `[1, 2] * -1` an empty list.
 * Fixed repeating a safe string dropping its safety in Rust.  Like in Jinja2 and Go, `("<a>"|safe) * 2` is now not escaped again.
 * Fixed repeating a string or sequence by a float too large for a 64-bit integer (like `1e30` or `-1e30`) in Go.  Like in Rust, this is now an error instead of depending on how the platform converts the float.
+* Fixed the `max` filter in Rust returning the last of multiple equal items.  Like in Jinja2 and Go, `max` now returns the first one like `min` already did, so `[true, 1]|max` is `True` instead of `1`, `[1, 1.0]|max` is `1` instead of `1.0` and `["a", "A"]|max` is `a` instead of `A`.  This also applies to `max(attribute=...)`.
+* Fixed the `groupby` filter labelling groups with the key of their last item in Rust and Go.  Like in Jinja2, a group of keys that are equal but not identical is now labelled with the key of its first item, so `[{"a": true}, {"a": 1}]|groupby("a")` is labelled `True` instead of `1` and `"CA"` and `"ca"` are grouped as `CA` if `"CA"` comes first.  Go also no longer reorders items whose keys only differ in case, so the items of a group are in their original order like in Rust and Jinja2.
 
 ## 3.0.5
 
