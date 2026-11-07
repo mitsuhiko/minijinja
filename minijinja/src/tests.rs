@@ -125,7 +125,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_odd(v: Value) -> bool {
-        i128::try_from(v).ok().is_some_and(|x| x % 2 != 0)
+        int_is_odd(v) == Some(true)
     }
 
     /// Checks if a value is even.
@@ -135,7 +135,18 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_even(v: Value) -> bool {
-        i128::try_from(v).ok().is_some_and(|x| x % 2 == 0)
+        int_is_odd(v) == Some(false)
+    }
+
+    /// Returns whether an integer is odd, or `None` if it is not an integer.
+    ///
+    /// Integers above the `i128` range are stored as `u128` and are checked
+    /// as such.
+    fn int_is_odd(v: Value) -> Option<bool> {
+        match v.0 {
+            crate::value::ValueRepr::U128(x) => Some(x.0 % 2 != 0),
+            _ => i128::try_from(v).ok().map(|x| x % 2 != 0),
+        }
     }
 
     /// Return true if the value is divisible by another one.
