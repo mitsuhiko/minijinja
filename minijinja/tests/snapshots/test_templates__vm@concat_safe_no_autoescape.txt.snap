@@ -1,0 +1,9 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{%- set s = \"<s>\"|safe -%}\n{{ a ~ s }}|{{ s ~ a }}|{{ a + s }}|{{ s + a }}\n{{ (a ~ s)|escape }}|{{ (s + a)|escape }}|{{ (s ~ s)|escape }}|{{ (s + s)|escape }}"
+info:
+  a: "<a>"
+input_file: minijinja/tests/inputs/concat_safe_no_autoescape.txt
+---
+<a><s>|<s><a>|<a><s>|<s><a>
+&lt;a&gt;&lt;s&gt;|&lt;s&gt;&lt;a&gt;|<s><s>|<s><s>

@@ -1,0 +1,17 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{%- set s = \"<s>\"|safe -%}\n{%- macro m() %}<m>{% endmacro -%}\ntilde: {{ a ~ s }}|{{ s ~ a }}|{{ s ~ s }}|{{ a ~ a }}\nplus: {{ a + s }}|{{ s + a }}|{{ s + s }}|{{ a + a }}\nchained: {{ a ~ s ~ a }}|{{ s + a + s }}\nother types: {{ s ~ n }}|{{ n ~ s }}|{{ s ~ none }}|{{ s ~ undefined }}|{{ s ~ seq }}\nmacro: {{ m() ~ a }}|{{ a ~ m() }}\nset: {% set x = s ~ a %}{{ x }}|{{ x ~ a }}|{{ (s ~ a)|length }}\nno autoescape: {% autoescape false %}{{ a ~ s }}|{{ s + a }}|{{ (a ~ s)|escape }}|{{ (s ~ s)|escape }}{% endautoescape %}"
+info:
+  a: "<a>"
+  n: 42
+  seq:
+    - "<x>"
+input_file: minijinja/tests/inputs/concat_safe.html
+---
+tilde: &lt;a&gt;<s>|<s>&lt;a&gt;|<s><s>|&lt;a&gt;&lt;a&gt;
+plus: &lt;a&gt;<s>|<s>&lt;a&gt;|<s><s>|&lt;a&gt;&lt;a&gt;
+chained: &lt;a&gt;<s>&lt;a&gt;|<s>&lt;a&gt;<s>
+other types: <s>42|42<s>|<s>None|<s>|<s>[&#x27;&lt;x&gt;&#x27;]
+macro: <m>&lt;a&gt;|&lt;a&gt;<m>
+set: <s>&lt;a&gt;|<s>&lt;a&gt;&lt;a&gt;|12
+no autoescape: <a><s>|<s><a>|&lt;a&gt;&lt;s&gt;|<s><s>

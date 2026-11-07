@@ -457,6 +457,75 @@ fn test_auto_escaping() {
 }
 
 #[test]
+fn test_safe_concat_escapes_for_auto_escape_mode() {
+    let ctx = context! {
+        s => Value::from_safe_string("<s>".into()),
+        a => "<a>",
+    };
+    let source = "{{ s ~ a }}|{{ a + s }}|{{ s ~ s }}|{{ a ~ a }}";
+
+    let mut env = Environment::new();
+    env.add_template("index.html", source).unwrap();
+    env.add_template("index.txt", source).unwrap();
+    #[cfg(feature = "json")]
+    {
+        env.add_template("index.js", source).unwrap();
+    }
+
+    let rv = env
+        .get_template("index.html")
+        .unwrap()
+        .render(&ctx)
+        .unwrap();
+    assert_eq!(rv, "<s>&lt;a&gt;|&lt;a&gt;<s>|<s><s>|&lt;a&gt;&lt;a&gt;");
+
+    // without auto escaping nothing is escaped
+    let rv = env.get_template("index.txt").unwrap().render(&ctx).unwrap();
+    assert_eq!(rv, "<s><a>|<a><s>|<s><s>|<a><a>");
+
+    // the unsafe side is formatted for the active auto escape mode
+    #[cfg(feature = "json")]
+    {
+        let rv = env.get_template("index.js").unwrap().render(&ctx).unwrap();
+        assert_eq!(rv, r#"<s>"<a>"|"<a>"<s>|<s><s>|"<a><a>""#);
+    }
+
+    // strict undefined still rejects undefined operands
+    let mut env = Environment::new();
+    env.set_undefined_behavior(UndefinedBehavior::Strict);
+    env.add_template("index.html", "{{ s ~ missing }}").unwrap();
+    let err = env
+        .get_template("index.html")
+        .unwrap()
+        .render(&ctx)
+        .unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::UndefinedError);
+}
+
+#[test]
+fn test_safe_concat_uses_formatter() {
+    let mut env = Environment::new();
+    env.set_auto_escape_callback(|_| minijinja::AutoEscape::Custom("markdown".into()));
+    env.set_formatter(|out, state, value| {
+        if value.is_safe() {
+            write!(out, "{value}").unwrap();
+        } else if matches!(state.auto_escape(), minijinja::AutoEscape::Custom(_)) {
+            write!(out, "{}", value.to_string().replace('*', "\\*")).unwrap();
+        } else {
+            write!(out, "{value}").unwrap();
+        }
+        Ok(())
+    });
+    let rv = env
+        .render_str(
+            "{{ ('**'|safe) ~ a ~ ('**'|safe) }}|{{ ('*'|safe) + a }}|{{ a ~ a }}",
+            context! { a => "*x*" },
+        )
+        .unwrap();
+    assert_eq!(rv, r"**\*x\***|*\*x\*|\*x\*\*x\*");
+}
+
+#[test]
 fn test_loop_changed() {
     let rv = minijinja::render!(
         r#"

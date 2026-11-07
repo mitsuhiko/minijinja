@@ -45,6 +45,7 @@ All notable changes to MiniJinja are documented here.
 * Fixed repeating a string or sequence a negative number of times failing in Rust and Go.  Like in Python, `"foo" * -1` is now an empty string and `[1, 2] * -1` an empty list.
 * Fixed repeating a safe string dropping its safety in Rust.  Like in Jinja2 and Go, `("<a>"|safe) * 2` is now not escaped again.
 * Fixed repeating a string or sequence by a float too large for a 64-bit integer (like `1e30` or `-1e30`) in Go.  Like in Rust, this is now an error instead of depending on how the platform converts the float.
+* Fixed `~` and `+` double escaping or not escaping safe strings with auto escaping enabled.  Like Jinja2's `markup_join` and `Markup.__add__`, concatenating a safe string with an unsafe value now escapes the unsafe value for the active auto escape mode and returns a safe string, so with `a = "<a>"` and HTML escaping `("<b>"|safe) ~ a` renders `<b>&lt;a&gt;` instead of `&lt;b&gt;&lt;a&gt;` in Rust.  In Go, `a + ("<b>"|safe)` no longer marks the unescaped `a` as safe, and `Value.Add` only returns a safe string if both strings are safe.  Concatenating two safe strings now also returns a safe string in Rust like it already did in Go.  Without auto escaping, values are still concatenated without escaping.
 
 ## 3.0.5
 
