@@ -105,7 +105,7 @@ mod builtins {
 
     use std::borrow::Cow;
 
-    use crate::value::ops::{coerce, CoerceResult};
+    use crate::value::ops::{coerce, rem, CoerceResult, WideInt};
     use crate::value::ValueKind;
 
     /// Return true if the object is a boolean value.
@@ -141,10 +141,13 @@ mod builtins {
     /// Returns whether an integer is odd, or `None` if it is not an integer.
     ///
     /// Integers above the `i128` range are stored as `u128` and are checked
-    /// as such.
+    /// as such.  Like in Jinja2, floats with an integer value count as
+    /// integers, so `1e20 is even` is true.
     fn int_is_odd(v: Value) -> Option<bool> {
         match v.0 {
             crate::value::ValueRepr::U128(x) => Some(x.0 % 2 != 0),
+            // `fract` is NaN for infinity, so it is not an integer
+            crate::value::ValueRepr::F64(x) => (x.fract() == 0.0).then(|| x % 2.0 != 0.0),
             _ => i128::try_from(v).ok().map(|x| x % 2 != 0),
         }
     }
@@ -154,13 +157,31 @@ mod builtins {
     /// ```jinja
     /// {{ 42 is divisibleby(2) }} -> true
     /// ```
+    ///
+    /// When used as the builtin `divisibleby` test, dividing a number by zero
+    /// fails like `%` does.  This function returns `false` in that case.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_divisibleby(v: &Value, other: &Value) -> bool {
-        match coerce(v, other, false) {
-            Some(CoerceResult::I128(a, b)) => (a % b) == 0,
-            Some(CoerceResult::F64(a, b)) => (a % b) == 0.0,
-            _ => false,
+        is_divisibleby_checked(v, other).unwrap_or(false)
+    }
+
+    /// The builtin `divisibleby` test.  Like [`is_divisibleby`] but dividing
+    /// a number by zero is an error like for `%` and in Jinja2.
+    pub(crate) fn is_divisibleby_checked(v: &Value, other: &Value) -> Result<bool, Error> {
+        let is_numeric = |v: &Value| matches!(v.kind(), ValueKind::Number | ValueKind::Bool);
+        if is_numeric(v) && is_numeric(other) && !other.is_true() {
+            return rem(v, other).map(|_| false);
         }
+        Ok(match coerce(v, other, false) {
+            // `wrapping_rem` only wraps for `i128::MIN % -1`, which is 0.
+            Some(CoerceResult::I128(a, b)) => b != 0 && a.wrapping_rem(b) == 0,
+            Some(CoerceResult::F64(a, b)) => (a % b) == 0.0,
+            Some(CoerceResult::Str(..)) => false,
+            None => match (WideInt::from_value(v), WideInt::from_value(other)) {
+                (Some(a), Some(b)) => a.div_rem_floor(b).is_some_and(|(_, rem)| rem.is_zero()),
+                _ => false,
+            },
+        })
     }
 
     /// Checks if this value is a number.

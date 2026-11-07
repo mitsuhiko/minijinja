@@ -184,7 +184,7 @@ fn build_builtin_tests() -> BTreeMap<Cow<'static, str>, Value> {
         rv.insert("even".into(), Value::from_function(tests::is_even));
         rv.insert(
             "divisibleby".into(),
-            Value::from_function(tests::is_divisibleby),
+            Value::from_function(tests::is_divisibleby_checked),
         );
         rv.insert("number".into(), Value::from_function(tests::is_number));
         rv.insert("integer".into(), Value::from_function(tests::is_integer));

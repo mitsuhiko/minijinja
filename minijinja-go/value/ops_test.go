@@ -187,6 +187,8 @@ func TestBigIntegerArithmetic(t *testing.T) {
 	}
 	maxI128 := "170141183460469231731687303715884105727"
 	minI128 := "-170141183460469231731687303715884105728"
+	maxU128 := "340282366920938463463374607431768211455"
+	twoTo127 := "170141183460469231731687303715884105728"
 
 	tests := []struct {
 		name string
@@ -208,6 +210,16 @@ func TestBigIntegerArithmetic(t *testing.T) {
 		{"float rem", Value.Rem, FromFloat(1000), bigInt("18446744073709551616"), "1000.0"},
 		{"pow", Value.Pow, bigInt("9223372036854775808"), FromInt(2), "85070591730234615865843651857942052864"},
 		{"pow negative exponent", Value.Pow, FromInt(1000), bigInt("-9223372036854775808"), "0.0"},
+		// Like in Rust, results are exact up to the largest u128.
+		{"add past i128", Value.Add, bigInt(maxI128), FromInt(1), twoTo127},
+		{"sub past i128", Value.Sub, bigInt(maxU128), FromInt(1), "340282366920938463463374607431768211454"},
+		{"sub back into int64", Value.Sub, bigInt(twoTo127), bigInt(twoTo127), "0"},
+		{"add u128 and i128", Value.Add, bigInt(maxU128), bigInt(minI128), maxI128},
+		{"mul past i128", Value.Mul, bigInt(maxI128), FromInt(2), "340282366920938463463374607431768211454"},
+		{"mul into smallest i128", Value.Mul, bigInt(twoTo127), FromInt(-1), minI128},
+		{"floor div u128", Value.FloorDiv, bigInt(maxU128), FromInt(2), maxI128},
+		{"rem u128", Value.Rem, bigInt(maxU128), FromInt(-10), "-5"},
+		{"pow past i128", Value.Pow, FromInt(2), FromInt(127), twoTo127},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -221,17 +233,22 @@ func TestBigIntegerArithmetic(t *testing.T) {
 		})
 	}
 
-	// Like the i128 math in Rust, results outside the i128 range fail.
+	// Like in Rust, results outside the integer range (-2**127 to 2**128 - 1)
+	// fail.
 	failures := []struct {
 		name string
 		op   func(Value, Value) (Value, error)
 		a, b Value
 	}{
-		{"add overflow", Value.Add, bigInt(maxI128), FromInt(1)},
+		{"add overflow", Value.Add, bigInt(maxU128), FromInt(1)},
 		{"sub overflow", Value.Sub, bigInt(minI128), FromInt(1)},
-		{"mul overflow", Value.Mul, bigInt(maxI128), FromInt(2)},
-		{"floor div operand overflow", Value.FloorDiv, bigInt("170141183460469231731687303715884105728"), FromInt(1)},
-		{"rem operand overflow", Value.Rem, bigInt("170141183460469231731687303715884105728"), FromInt(3)},
+		{"sub overflow below zero", Value.Sub, FromInt(0), bigInt(maxU128)},
+		{"mul overflow", Value.Mul, bigInt(maxU128), FromInt(2)},
+		{"mul overflow negative", Value.Mul, bigInt(maxU128), FromInt(-1)},
+		{"floor div result overflow", Value.FloorDiv, bigInt(maxU128), FromInt(-1)},
+		{"floor div operand overflow", Value.FloorDiv, bigInt("340282366920938463463374607431768211456"), FromInt(1)},
+		{"rem operand overflow", Value.Rem, bigInt("340282366920938463463374607431768211456"), FromInt(3)},
+		{"pow result overflow", Value.Pow, FromInt(2), FromInt(128)},
 		{"floor div by zero", Value.FloorDiv, bigInt("9223372036854775808"), FromInt(0)},
 		{"rem by zero", Value.Rem, bigInt("9223372036854775808"), FromInt(0)},
 		{"pow overflow", Value.Pow, FromInt(2), bigInt("9223372036854775808")},
@@ -253,5 +270,40 @@ func TestRepeatOutOfRangeFloat(t *testing.T) {
 				t.Fatalf("%v * %v: expected error, got %v", seq, count, rv)
 			}
 		}
+	}
+}
+
+func TestNegIntegerRange(t *testing.T) {
+	bigInt := func(s string) Value {
+		n, ok := new(big.Int).SetString(s, 10)
+		if !ok {
+			t.Fatalf("invalid big integer %q", s)
+		}
+		return FromBigInt(n)
+	}
+	tests := []struct {
+		in   Value
+		want string
+	}{
+		{FromInt(math.MinInt64), "9223372036854775808"},
+		{bigInt("9223372036854775808"), "-9223372036854775808"},
+		{bigInt("-170141183460469231731687303715884105728"), "170141183460469231731687303715884105728"},
+		{bigInt("170141183460469231731687303715884105728"), "-170141183460469231731687303715884105728"},
+	}
+	for _, test := range tests {
+		rv, err := test.in.Neg()
+		if err != nil {
+			t.Fatalf("negating %s failed: %v", test.in, err)
+		}
+		if got := rv.String(); got != test.want {
+			t.Errorf("-%s: got %s, want %s", test.in, got, test.want)
+		}
+	}
+	// -9223372036854775808 is an int64 again
+	if rv, _ := bigInt("9223372036854775808").Neg(); !rv.IsActualInt() {
+		t.Errorf("expected an int64, got %#v", rv)
+	}
+	if rv, err := bigInt("170141183460469231731687303715884105729").Neg(); err == nil {
+		t.Fatalf("expected an error, got %s", rv)
 	}
 }

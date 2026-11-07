@@ -1,0 +1,8 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "integral floats: {{ 3.0 is odd }} {{ -3.0 is odd }} {{ 4.0 is even }} {{ -0.0 is even }} {{ 1e20 is even }} {{ 1e20 is odd }} {{ 1e300 is even }}\nother floats: {{ 1.5 is odd }} {{ 1.5 is even }} {{ 1e400 is odd }} {{ 1e400 is even }}"
+info: {}
+input_file: minijinja/tests/inputs/odd_even_floats.txt
+---
+integral floats: True True True True True False True
+other floats: False False False False

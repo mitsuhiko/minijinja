@@ -166,6 +166,28 @@ func TestLexerBasic(t *testing.T) {
 	}
 }
 
+// Like in Rust, float literals too large for a float64 are infinity.
+func TestLexerFloatOverflow(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"{{ 1e400 }}", "inf"},
+		{"{{ 1_0e400 }}", "inf"},
+		{"{{ 1.5E+999 }}", "inf"},
+		{"{{ 1e-400 }}", "0.0"},
+	}
+	for _, test := range tests {
+		tokens, err := Tokenize(test.input, syntax.DefaultSyntax(), syntax.DefaultWhitespace())
+		if err != nil {
+			t.Fatalf("%q: unexpected error: %v", test.input, err)
+		}
+		if tokens[1].Type != TokenFloat || tokens[1].Value != test.want {
+			t.Errorf("%q: expected Float(%s), got %s(%q)", test.input, test.want, tokens[1].Type, tokens[1].Value)
+		}
+	}
+}
+
 func TestLexerStringEscapeCompatibility(t *testing.T) {
 	tests := []struct {
 		name       string
