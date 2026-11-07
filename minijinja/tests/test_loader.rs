@@ -137,6 +137,7 @@ fn test_auto_reload_disabled() {
     assert_eq!(env.get_template("a").unwrap().render(()).unwrap(), "2");
 }
 
+#[cfg(feature = "multi_template")]
 #[test]
 fn test_auto_reload_dependencies() {
     let sources: Sources = Default::default();

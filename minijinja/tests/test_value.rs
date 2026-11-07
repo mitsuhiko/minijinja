@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-use std::cmp::Ordering;
 use std::collections::BTreeMap;
 #[cfg(feature = "std_collections")]
 use std::collections::{BTreeSet, HashMap, HashSet, LinkedList, VecDeque};
@@ -10,9 +8,9 @@ use insta::{assert_debug_snapshot, assert_snapshot};
 use similar_asserts::assert_eq;
 
 use minijinja::value::{
-    ArgType, DynObject, Enumerator, Kwargs, Object, ObjectRepr, Rest, StringInput, Value, ValueKind,
+    ArgType, DynObject, Enumerator, Kwargs, Object, ObjectRepr, Rest, Value, ValueKind,
 };
-use minijinja::{args, context, render, Environment, Error, ErrorKind, State, UndefinedBehavior};
+use minijinja::{args, context, render, Environment, Error, ErrorKind, State};
 
 #[test]
 fn test_sort() {
@@ -452,8 +450,13 @@ fn test_functions_with_mutable_state() {
     assert!(!state.perform_test("matches_counter", args!(5)).unwrap());
 }
 
+#[cfg(feature = "builtins")]
 #[test]
 fn test_mutable_state_argument_conversion_uses_state() {
+    use minijinja::value::StringInput;
+    use minijinja::UndefinedBehavior;
+    use std::borrow::Cow;
+
     struct LookupFromState(Value);
 
     impl<'a> ArgType<'a> for LookupFromState {
@@ -719,6 +722,7 @@ fn test_seq_object_borrow() {
     );
 }
 
+#[cfg(feature = "builtins")]
 #[test]
 fn test_one_shot_iterator() {
     let value = Value::make_one_shot_iterator(0..10);
@@ -748,6 +752,7 @@ fn test_one_shot_iterator() {
     assert_snapshot!(rv, @r###"abcde"###);
 }
 
+#[cfg(feature = "builtins")]
 #[test]
 fn test_make_iterable() {
     let value = Value::make_iterable(|| 0..10);
@@ -965,6 +970,7 @@ fn test_plain_object() {
     assert_snapshot!(render!("{{ x }}|{{ x.missing_attr is undefined }}", x), @"X|True");
 }
 
+#[cfg(feature = "builtins")]
 #[test]
 fn test_reverse() {
     // reverse vectors
@@ -1499,8 +1505,11 @@ fn test_plain_object_compare() {
     assert!(v1 > Value::from(vec![1, 2, 3]));
 }
 
+#[cfg(feature = "builtins")]
 #[test]
 fn test_custom_object_compare() {
+    use std::cmp::Ordering;
+
     #[derive(Debug)]
     struct X(i32);
 

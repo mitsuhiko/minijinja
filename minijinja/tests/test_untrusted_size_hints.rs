@@ -1,5 +1,6 @@
 //! Iterators provided by objects can report arbitrary size hints.  The engine
 //! must not trust them for preallocations as that can abort the process.
+#![cfg(feature = "builtins")]
 use minijinja::value::Value;
 use minijinja::{context, Environment};
 
