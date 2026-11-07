@@ -10,6 +10,7 @@ All notable changes to MiniJinja are documented here.
 * Added `State::consume_fuel` in Rust and `State.ConsumeFuel` in Go so that custom filters and functions can charge fuel for expensive work.  #483
 * Constant folding no longer creates strings or sequences larger than 1KB at compile time.  Larger values are created when rendering, where they are subject to fuel.
 * Improved the performance of slicing strings with a step of 1.
+* Improved the performance of the `title` filter and of `~` when both operands are strings.
 * Added `Template::render_with_spans` in Rust and `Template.RenderWithSpans` in Go which render a template and also return `OutputSpan`s that map ranges of the rendered output back to the template and source range that wrote them.  Output of macros, `{% filter %}` and `{% call %}` blocks is attributed to the expression that emits it.  In Rust this requires the `debug` feature.  #1004
 * Fixed Go running the parent template, blocks and macros in the context of the template they were invoked from.  Like in Rust, `State.Name()`, errors and relative template paths now refer to the template that defines the code being executed.
 * Like in Rust, `{{ super() }}`, `{{ loop(...) }}` and `{{ self.block() }}` in Go now write their output directly instead of capturing it first.  As a result, they no longer pass through a custom formatter and consume slightly less fuel.
