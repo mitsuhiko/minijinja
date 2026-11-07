@@ -1,8 +1,9 @@
 use crate::error::{Error, ErrorKind};
-use crate::utils::{collect_untrusted, untrusted_size_hint};
+use crate::output::Output;
+use crate::utils::{collect_untrusted, untrusted_size_hint, AutoEscape};
 use crate::value::merge_object::MergeSeq;
 use crate::value::{
-    checked, DynObject, MaybeInvalid, ObjectRepr, Tuple, Value, ValueKind, ValueRepr,
+    checked, DynObject, MaybeInvalid, ObjectRepr, StringType, Tuple, Value, ValueKind, ValueRepr,
 };
 use crate::vm::State;
 
@@ -544,7 +545,7 @@ pub fn add(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
             None => wide_int_op("+", lhs, rhs, WideInt::checked_add),
         },
         Some(CoerceResult::F64(a, b)) => Ok((a + b).into()),
-        Some(CoerceResult::Str(a, b)) => Ok(Value::from([a, b].concat())),
+        Some(CoerceResult::Str(a, b)) => Ok(concat_result([a, b].concat(), lhs, rhs)),
         None => wide_int_op("+", lhs, rhs, WideInt::checked_add),
     }
 }
@@ -795,15 +796,59 @@ pub fn neg(val: &Value) -> Result<Value, Error> {
 }
 
 /// Attempts a string concatenation.
+///
+/// This does not escape anything.  The result is only safe if both sides are
+/// safe; for concatenations where only one side is safe and auto escaping is
+/// enabled, [`markup_concat`] needs to be used instead.
 pub fn string_concat(left: Value, right: &Value) -> Value {
     // Fast path for the common case of two strings: skip the formatter.
     if let (Some(l), Some(r)) = (plain_str(&left), plain_str(right)) {
         let mut rv = String::with_capacity(l.len() + r.len());
         rv.push_str(l);
         rv.push_str(r);
-        return Value::from(rv);
+        return concat_result(rv, &left, right);
     }
     Value::from(format!("{left}{right}"))
+}
+
+/// Wraps the result of a concatenation, keeping it safe if both sides are.
+fn concat_result(rv: String, left: &Value, right: &Value) -> Value {
+    if left.is_safe() && right.is_safe() {
+        Value::from_safe_string(rv)
+    } else {
+        Value::from(rv)
+    }
+}
+
+/// Checks if a concatenation has to escape one of the two sides.
+///
+/// This is the case if auto escaping is enabled and exactly one side is
+/// a safe string.  This mirrors Jinja2's `markup_join`.
+#[inline(always)]
+pub(crate) fn needs_markup_concat(state: &State, left: &Value, right: &Value) -> bool {
+    left.is_safe() != right.is_safe() && !matches!(state.auto_escape(), AutoEscape::None)
+}
+
+/// Concatenates two values into a safe string.
+///
+/// Safe values are copied unchanged, all other values are escaped for the
+/// current auto escape mode with the formatter, like when they are printed.
+pub(crate) fn markup_concat(
+    state: &mut State,
+    left: &Value,
+    right: &Value,
+) -> Result<Value, Error> {
+    let mut rv = String::new();
+    let mut out = Output::new(&mut rv);
+    for value in [left, right] {
+        match value.0 {
+            ValueRepr::String(ref s, StringType::Safe) => {
+                ok!(out.write_str(s).map_err(Error::from))
+            }
+            _ => ok!(state.env().format(value, state, &mut out)),
+        }
+    }
+    Ok(Value::from_safe_string(rv))
 }
 
 fn plain_str(v: &Value) -> Option<&str> {

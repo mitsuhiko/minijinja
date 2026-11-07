@@ -172,11 +172,15 @@ func intArith(v, other Value, opName string, checked func(a, b int64) (int64, bo
 }
 
 // Add performs addition or string concatenation.
+//
+// Concatenating two strings does not escape anything, so the result is only
+// safe if both strings are safe.  Templates escape the unsafe side of an
+// addition of a safe and an unsafe string when auto escaping is enabled.
 func (v Value) Add(other Value) (Value, error) {
 	// String concatenation
 	if s1, ok := v.AsString(); ok {
 		if s2, ok := other.AsString(); ok {
-			if v.IsSafe() || other.IsSafe() {
+			if v.IsSafe() && other.IsSafe() {
 				return FromSafeString(s1 + s2), nil
 			}
 			return FromString(s1 + s2), nil
@@ -851,6 +855,10 @@ func isSeqOrIterable(v Value) bool {
 }
 
 // Concat performs the tilde (~) string concatenation.
+//
+// This does not escape anything, so the result is only safe if both values
+// are safe.  Templates escape the unsafe side of a concatenation of a safe and
+// an unsafe value when auto escaping is enabled.
 func (v Value) Concat(other Value) Value {
 	s1 := v.String()
 	s2 := other.String()
