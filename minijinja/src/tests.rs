@@ -158,12 +158,18 @@ mod builtins {
     /// {{ 42 is divisibleby(2) }} -> true
     /// ```
     ///
-    /// Like `%`, this fails if a number is divided by zero.
+    /// When used as the builtin `divisibleby` test, dividing a number by zero
+    /// fails like `%` does.  This function returns `false` in that case.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_divisibleby(v: &Value, other: &Value) -> Result<bool, Error> {
+    pub fn is_divisibleby(v: &Value, other: &Value) -> bool {
+        is_divisibleby_checked(v, other).unwrap_or(false)
+    }
+
+    /// The builtin `divisibleby` test.  Like [`is_divisibleby`] but dividing
+    /// a number by zero is an error like for `%` and in Jinja2.
+    pub(crate) fn is_divisibleby_checked(v: &Value, other: &Value) -> Result<bool, Error> {
         let is_numeric = |v: &Value| matches!(v.kind(), ValueKind::Number | ValueKind::Bool);
         if is_numeric(v) && is_numeric(other) && !other.is_true() {
-            // Like `%` and like in Jinja2, dividing by zero is an error.
             return rem(v, other).map(|_| false);
         }
         Ok(match coerce(v, other, false) {

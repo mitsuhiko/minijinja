@@ -61,6 +61,15 @@ fn test_number_tests_integer_range() {
             Some(format!("unable to calculate {rem}").as_str())
         );
     }
+    // the public function stays infallible and returns false instead
+    assert!(!minijinja::tests::is_divisibleby(
+        &minijinja::Value::from(5),
+        &minijinja::Value::from(0)
+    ));
+    assert!(minijinja::tests::is_divisibleby(
+        &minijinja::Value::from(10),
+        &minijinja::Value::from(5)
+    ));
     // values that are not numbers are still just not divisible
     assert_eq!(render("{{ 'a' is divisibleby 0 }}"), "False");
     assert_eq!(render("{{ none is divisibleby 0 }}"), "False");
