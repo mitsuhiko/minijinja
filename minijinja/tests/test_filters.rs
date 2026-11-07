@@ -385,6 +385,56 @@ fn test_abs_overflow() {
 }
 
 #[test]
+fn test_min_max_ties_return_first() {
+    let env = Environment::new();
+    for (expr, expected) in [
+        ("[true, 1]|max", Value::from(true)),
+        ("[true, 1]|min", Value::from(true)),
+        ("[1, 1.0]|max", Value::from(1)),
+        ("[1.0, 1]|min", Value::from(1.0)),
+        ("['a', 'A']|max", Value::from("a")),
+        ("['A', 'a']|min", Value::from("A")),
+        (
+            "[{'k': 1, 'n': 'x'}, {'k': 1, 'n': 'y'}]|max(attribute='k')",
+            Value::from("x"),
+        ),
+        (
+            "[{'k': 'a', 'n': 'x'}, {'k': 'A', 'n': 'y'}]|min(attribute='k')",
+            Value::from("x"),
+        ),
+    ] {
+        let mut rv = env.compile_expression(expr).unwrap().eval(()).unwrap();
+        if rv.kind() == ValueKind::Map {
+            rv = rv.get_attr("n").unwrap();
+        }
+        assert_eq!(rv.kind(), expected.kind(), "{expr}");
+        assert_eq!(rv.to_string(), expected.to_string(), "{expr}");
+    }
+}
+
+#[test]
+fn test_groupby_ties_use_first_key() {
+    let env = Environment::new();
+    for (expr, expected) in [
+        ("[{'a': true}, {'a': 1}]|groupby('a')", Value::from(true)),
+        ("[{'a': 1}, {'a': 1.0}]|groupby('a')", Value::from(1)),
+        ("[{'a': 1.0}, {'a': 1}]|groupby('a')", Value::from(1.0)),
+        ("[{'a': 'x'}, {'a': 'X'}]|groupby('a')", Value::from("x")),
+        ("[{'a': 'X'}, {'a': 'x'}]|groupby('a')", Value::from("X")),
+    ] {
+        let rv = env.compile_expression(expr).unwrap().eval(()).unwrap();
+        assert_eq!(rv.len(), Some(1), "{expr}");
+        let grouper = rv
+            .get_item_by_index(0)
+            .unwrap()
+            .get_item_by_index(0)
+            .unwrap();
+        assert_eq!(grouper.kind(), expected.kind(), "{expr}");
+        assert_eq!(grouper.to_string(), expected.to_string(), "{expr}");
+    }
+}
+
+#[test]
 fn test_chain_lists() {
     let env = Environment::new();
     let tmpl = env
