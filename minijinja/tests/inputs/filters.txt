@@ -33,6 +33,7 @@ title-three-words: {{ three_words|title }}
 title-apostrophe: {{ "don't stop believing"|title }}
 title-underscore: {{ "foo_bar.baz"|title }}
 title-brackets: {{ "foo (bar) [baz] {qux} <quux>"|title }}
+title-unicode: {{ "éCOLE straße ǆungla ΣΊΣΥΦΟΣ"|title }}
 capitalize: {{ word|capitalize }}
 capitalize-three-words: {{ three_words|capitalize }}
 replace: {{ word|replace("B", "th") }}
