@@ -1,0 +1,15 @@
+{
+  "a": "<a>",
+  "n": 42,
+  "seq": ["<x>"]
+}
+---
+{%- set s = "<s>"|safe -%}
+{%- macro m() %}<m>{% endmacro -%}
+tilde: {{ a ~ s }}|{{ s ~ a }}|{{ s ~ s }}|{{ a ~ a }}
+plus: {{ a + s }}|{{ s + a }}|{{ s + s }}|{{ a + a }}
+chained: {{ a ~ s ~ a }}|{{ s + a + s }}
+other types: {{ s ~ n }}|{{ n ~ s }}|{{ s ~ none }}|{{ s ~ undefined }}|{{ s ~ seq }}
+macro: {{ m() ~ a }}|{{ a ~ m() }}
+set: {% set x = s ~ a %}{{ x }}|{{ x ~ a }}|{{ (s ~ a)|length }}
+no autoescape: {% autoescape false %}{{ a ~ s }}|{{ s + a }}|{{ (a ~ s)|escape }}|{{ (s ~ s)|escape }}{% endautoescape %}

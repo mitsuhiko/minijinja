@@ -15,7 +15,7 @@ use crate::utils::{untrusted_size_hint, write_escaped, AutoEscape, UndefinedBeha
 use crate::value::namespace_object::Namespace;
 use crate::value::{
     checked, ops, value_map_with_capacity, Kwargs, MaybeInvalid, ObjectRepr, UndefinedOrigin,
-    UndefinedType, Value, ValueMap, ValueRepr,
+    UndefinedType, Value, ValueKind, ValueMap, ValueRepr,
 };
 use crate::vm::context::{Frame, Stack};
 use crate::vm::loop_object::{Loop, LoopState, RecurseTarget};
@@ -645,7 +645,22 @@ impl<'env> Executor<'env> {
                     }
                     stack.push(Value::from(len));
                 }
-                Instruction::Add => alloc_binop!(add),
+                Instruction::Add => {
+                    b = stack.pop();
+                    a = stack.pop();
+                    ctx_ok!(ops::ensure_fuel_for_binop(state, "add", &a, &b));
+                    // like in Jinja2, adding a plain string to a safe string
+                    // escapes it when auto escaping is enabled.
+                    let rv = if a.kind() == ValueKind::String
+                        && b.kind() == ValueKind::String
+                        && ops::needs_markup_concat(state, &a, &b)
+                    {
+                        ops::markup_concat(state, &a, &b)
+                    } else {
+                        ops::add(&a, &b)
+                    };
+                    stack.push(charge_value!(ctx_ok!(rv)));
+                }
                 Instruction::Sub => func_binop!(sub),
                 Instruction::Mul => alloc_binop!(mul),
                 Instruction::Div => func_binop!(div),
@@ -671,7 +686,11 @@ impl<'env> Executor<'env> {
                     // like emitting, formatting containers into the string
                     // is more expensive than copying strings.
                     let formats_object = b.as_object().is_some() || a.as_object().is_some();
-                    let rv = charge_value!(ops::string_concat(b, &a));
+                    let rv = charge_value!(if ops::needs_markup_concat(state, &b, &a) {
+                        ctx_ok!(ops::markup_concat(state, &b, &a))
+                    } else {
+                        ops::string_concat(b, &a)
+                    });
                     if formats_object {
                         ctx_ok!(state.charge_serialized(rv.as_str().map_or(0, |x| x.len())));
                     }
