@@ -715,6 +715,8 @@ impl PartialEq for Value {
             (&ValueRepr::String(ref a, _), &ValueRepr::String(ref b, _)) => a == b,
             (&ValueRepr::SmallStr(ref a), &ValueRepr::SmallStr(ref b)) => a.as_str() == b.as_str(),
             (&ValueRepr::Bytes(ref a), &ValueRepr::Bytes(ref b)) => a == b,
+            // `coerce` cannot represent u128 values above i128::MAX.
+            (&ValueRepr::U128(a), &ValueRepr::U128(b)) => a.0 == b.0,
             _ => match ops::coerce(self, other, false) {
                 Some(ops::CoerceResult::F64(a, b)) => a == b,
                 Some(ops::CoerceResult::I128(a, b)) => a == b,
@@ -912,8 +914,7 @@ impl Ord for Value {
                 a.as_str().cmp(b.as_str())
             }
             (&ValueRepr::Bytes(ref a), &ValueRepr::Bytes(ref b)) => a.cmp(b),
-            // `coerce` represents two u128 values as i128, which reverses the
-            // order if only one of them exceeds i128::MAX.
+            // `coerce` cannot represent u128 values above i128::MAX.
             (&ValueRepr::U128(a), &ValueRepr::U128(b)) => { a.0 }.cmp(&{ b.0 }),
             _ => match ops::coerce(self, other, false) {
                 Some(ops::CoerceResult::F64(a, b)) => cmp_f64(a, b),

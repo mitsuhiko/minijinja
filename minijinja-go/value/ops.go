@@ -10,8 +10,6 @@ import (
 	"strings"
 )
 
-var minI128AsU128 = new(big.Int).Lsh(big.NewInt(1), 127)
-
 const (
 	maxRepeatedStringLen   = 100_000_000
 	maxRepeatedSequenceLen = 100_000_000
@@ -21,13 +19,18 @@ const (
 func (v Value) Neg() (Value, error) {
 	switch d := v.data.(type) {
 	case int64:
-		return FromInt(-d), nil
-	case bigIntValue:
-		if d.Int.Sign() >= 0 && d.Int.Cmp(minI128AsU128) == 0 {
-			return FromBigInt(new(big.Int).Set(d.Int)), nil
+		if d != math.MinInt64 {
+			return FromInt(-d), nil
 		}
+		return FromBigInt(new(big.Int).Neg(big.NewInt(d))), nil
+	case bigIntValue:
+		// Like in Rust, this works in both directions for 2**127 but fails
+		// for results that are out of the integer range.
 		result := new(big.Int).Neg(d.Int)
-		return FromBigInt(result), nil
+		if !fitsIntRange(result) {
+			return Undefined(), fmt.Errorf("unable to calculate -%s", v.Repr())
+		}
+		return bigIntResult(result), nil
 	case float64:
 		return FromFloat(-d), nil
 	default:
@@ -105,13 +108,16 @@ func arithmeticBigInt(v Value) *big.Int {
 	return big.NewInt(arithmeticInt(v))
 }
 
-var maxI128 = new(big.Int).Sub(minI128AsU128, big.NewInt(1))
-var minI128 = new(big.Int).Neg(minI128AsU128)
+// The range of integers that Rust can represent: from the smallest i128 to
+// the largest u128.
+var minInt = new(big.Int).Neg(new(big.Int).Lsh(big.NewInt(1), 127))
+var maxInt = new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 128), big.NewInt(1))
 
-// fitsI128 reports whether an integer is in the range of the i128 integers
-// that Rust does integer math with.
-func fitsI128(x *big.Int) bool {
-	return x.Cmp(minI128) >= 0 && x.Cmp(maxI128) <= 0
+// fitsIntRange reports whether an integer is in the range of integers that
+// Rust can represent (-2**127 to 2**128 - 1).  Integer math is exact within
+// that range and fails outside of it.
+func fitsIntRange(x *big.Int) bool {
+	return x.Cmp(minInt) >= 0 && x.Cmp(maxInt) <= 0
 }
 
 func bigIntResult(x *big.Int) Value {
@@ -148,9 +154,9 @@ func checkedMul(a, b int64) (int64, bool) {
 }
 
 // intArith applies an operation to two integer operands.  Unlike float64 math
-// this is exact, and like the i128 math in Rust a result that doesn't fit an
-// int64 becomes a big integer instead of overflowing, while operands or
-// results outside the i128 range fail.
+// this is exact, and like in Rust a result that doesn't fit an int64 becomes a
+// big integer instead of overflowing, while operands or results outside the
+// integer range (-2**127 to 2**128 - 1) fail.
 func intArith(v, other Value, opName string, checked func(a, b int64) (int64, bool), op func(z, x, y *big.Int) *big.Int) (Value, error) {
 	if !isBigInt(v) && !isBigInt(other) {
 		if result, ok := checked(arithmeticInt(v), arithmeticInt(other)); ok {
@@ -159,7 +165,7 @@ func intArith(v, other Value, opName string, checked func(a, b int64) (int64, bo
 	}
 	a, b := arithmeticBigInt(v), arithmeticBigInt(other)
 	result := op(new(big.Int), a, b)
-	if !fitsI128(a) || !fitsI128(b) || !fitsI128(result) {
+	if !fitsIntRange(a) || !fitsIntRange(b) || !fitsIntRange(result) {
 		return Undefined(), fmt.Errorf("unable to calculate %s %s %s", v.Repr(), opName, other.Repr())
 	}
 	return bigIntResult(result), nil
@@ -460,11 +466,11 @@ func (v Value) Rem(other Value) (Value, error) {
 
 // bigIntDivRem performs floor division (`//`) or modulo (`%`) where at least
 // one integer operand is a big integer.  Like in Rust, the operands have to
-// fit an i128, but the smallest i128 floor divided by -1 gives 2**127 and the
-// matching remainder is 0.
+// be in the integer range (-2**127 to 2**128 - 1) and so has the result, so
+// the largest u128 floor divided by -1 fails.
 func bigIntDivRem(v, other Value, opName string) (Value, error) {
 	a, b := arithmeticBigInt(v), arithmeticBigInt(other)
-	if !fitsI128(a) || !fitsI128(b) {
+	if !fitsIntRange(a) || !fitsIntRange(b) {
 		return Undefined(), fmt.Errorf("unable to calculate %s %s %s", v.Repr(), opName, other.Repr())
 	}
 	if b.Sign() == 0 {
@@ -477,6 +483,9 @@ func bigIntDivRem(v, other Value, opName string) (Value, error) {
 	result := quotient
 	if opName == "%" {
 		result = remainder
+	}
+	if !fitsIntRange(result) {
+		return Undefined(), fmt.Errorf("unable to calculate %s %s %s", v.Repr(), opName, other.Repr())
 	}
 	return bigIntResult(result), nil
 }
@@ -503,21 +512,22 @@ func (v Value) Pow(other Value) (Value, error) {
 	return FromFloat(math.Pow(f1, f2)), nil
 }
 
-// intPow raises an integer to a non-negative integer power.  Like the i128
-// math in Rust, it fails if the result does not fit into 128 bits.
+// intPow raises an integer to a non-negative integer power.  Like in Rust, it
+// fails if the result is out of the integer range (-2**127 to 2**128 - 1).
 func intPow(base, exp *big.Int) (Value, bool) {
-	if !fitsI128(base) || !fitsI128(exp) {
+	if !fitsIntRange(base) || !fitsIntRange(exp) {
 		return Value{}, false
 	}
 	// Like in Rust, the exponent has to fit into a u32.
 	if exp.Cmp(big.NewInt(math.MaxUint32)) > 0 {
 		return Value{}, false
 	}
-	if base.CmpAbs(big.NewInt(1)) > 0 && exp.Cmp(big.NewInt(127)) > 0 {
+	// Avoid computing huge powers that are out of range anyway.
+	if base.CmpAbs(big.NewInt(1)) > 0 && exp.Cmp(big.NewInt(128)) > 0 {
 		return Value{}, false
 	}
 	result := new(big.Int).Exp(base, exp, nil)
-	if !fitsI128(result) {
+	if !fitsIntRange(result) {
 		return Value{}, false
 	}
 	return bigIntResult(result), true

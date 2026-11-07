@@ -1,0 +1,4 @@
+{}
+---
+integral floats: {{ 3.0 is odd }} {{ -3.0 is odd }} {{ 4.0 is even }} {{ -0.0 is even }} {{ 1e20 is even }} {{ 1e20 is odd }} {{ 1e300 is even }}
+other floats: {{ 1.5 is odd }} {{ 1.5 is even }} {{ 1e400 is odd }} {{ 1e400 is even }}

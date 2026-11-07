@@ -903,9 +903,9 @@ func TestNumberTestsCoerceLikeRust(t *testing.T) {
 		{`{{ true is divisibleby(1) }}`, `True`},
 		{`{{ 6.5 is divisibleby(0.5) }}`, `True`},
 		{`{{ 7 is divisibleby(2.0) }}`, `False`},
-		{`{{ 10 is divisibleby(0) }}`, `False`},
-		{`{{ 10 is divisibleby(false) }}`, `False`},
 		{`{{ "10" is divisibleby(5) }}`, `False`},
+		{`{{ "10" is divisibleby(0) }}`, `False`},
+		{`{{ 340282366920938463463374607431768211455 is divisibleby(5) }}`, `True`},
 	}
 
 	for _, test := range tests {
@@ -919,6 +919,29 @@ func TestNumberTestsCoerceLikeRust(t *testing.T) {
 		}
 		if result != test.expected {
 			t.Errorf("%q: expected %q, got %q", test.template, test.expected, result)
+		}
+	}
+}
+
+// Like `%` and like in Rust and Jinja2, dividing a number by zero fails.
+func TestDivisibleByZero(t *testing.T) {
+	env := NewEnvironment()
+	for _, src := range []string{
+		`{{ 10 is divisibleby(0) }}`,
+		`{{ 10 is divisibleby(0.0) }}`,
+		`{{ 10 is divisibleby(false) }}`,
+		`{{ 10.5 is divisibleby(0) }}`,
+		`{{ 340282366920938463463374607431768211455 is divisibleby(0) }}`,
+	} {
+		tmpl, err := env.TemplateFromString(src)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", src, err)
+		}
+		result, err := tmpl.Render(nil)
+		if err == nil {
+			t.Errorf("%q: expected an error, got %q", src, result)
+		} else if !strings.Contains(err.Error(), "invalid operation") {
+			t.Errorf("%q: expected an invalid operation, got %v", src, err)
 		}
 	}
 }

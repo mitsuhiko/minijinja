@@ -1,0 +1,7 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{{ 1e400 }} {{ -1e400 }} {{ 1e-400 }} {{ 1e400 is number }} {{ 1E400 > 1e308 }}"
+info: {}
+input_file: minijinja/tests/inputs/float_literal_overflow.txt
+---
+inf -inf 0.0 True True
