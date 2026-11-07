@@ -1,6 +1,7 @@
 package value
 
 import (
+	"bytes"
 	"cmp"
 	"fmt"
 	"math"
@@ -525,6 +526,12 @@ func boolToFloat(b bool) float64 {
 	return 0.0
 }
 
+// intEqualsFloat reports whether an integer and a float are the same
+// number.
+func intEqualsFloat(i int64, f float64) bool {
+	return f == math.Trunc(f) && f >= -(1<<63) && f < 1<<63 && int64(f) == i
+}
+
 func boolToInt(b bool) int64 {
 	if b {
 		return 1
@@ -568,7 +575,27 @@ func (v Value) Equal(other Value) bool {
 	}
 	if f1, ok := v.AsFloat(); ok {
 		if f2, ok := other.AsFloat(); ok {
+			// Like in Rust and Python, integers and floats are only equal
+			// if they are the same number, without rounding the integer.
+			i1, isInt1 := v.data.(int64)
+			i2, isInt2 := other.data.(int64)
+			switch {
+			case isInt1 && isInt2:
+				return i1 == i2
+			case isInt1:
+				return intEqualsFloat(i1, f2)
+			case isInt2:
+				return intEqualsFloat(i2, f1)
+			}
 			return f1 == f2
+		}
+		return false
+	}
+
+	// Bytes comparison
+	if b1, ok := v.data.([]byte); ok {
+		if b2, ok := other.data.([]byte); ok {
+			return bytes.Equal(b1, b2)
 		}
 		return false
 	}
