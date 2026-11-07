@@ -778,17 +778,15 @@ func fromReflectValue(rv reflect.Value) Value {
 		// Maps with other keys keep their keys as values, so that a
 		// map[int]string can be indexed with integers.  Go maps have no
 		// order, so the keys are sorted like MiniJinja for Rust sorts them.
-		unsorted := newMapWithCapacity(rv.Len())
+		pairs := make([][2]Value, 0, rv.Len())
 		iter := rv.MapRange()
 		for iter.Next() {
-			unsorted.Set(fromReflectValue(iter.Key()), fromReflectValue(iter.Value()))
+			pairs = append(pairs, [2]Value{fromReflectValue(iter.Key()), fromReflectValue(iter.Value())})
 		}
-		keys := unsorted.Keys()
-		sortMapKeys(keys)
-		m := newMapWithCapacity(len(keys))
-		for _, k := range keys {
-			v, _ := unsorted.Get(k)
-			m.Set(k, v)
+		sortPairs(pairs)
+		m := newMapWithCapacity(len(pairs))
+		for _, pair := range pairs {
+			m.Set(pair[0], pair[1])
 		}
 		return FromValueMap(m)
 	case reflect.Struct:

@@ -812,21 +812,17 @@ func (v Value) Compare(other Value) (int, bool) {
 // compareMaps compares two maps by their (key, value) pairs in key order.
 // Keys are ordered as values, so {9: 1} < {10: 1}.
 func compareMaps(m1, m2 *Map) int {
-	keys1 := m1.Keys()
-	keys2 := m2.Keys()
-	sortMapKeys(keys1)
-	sortMapKeys(keys2)
-	for i := 0; i < len(keys1) && i < len(keys2); i++ {
-		if cmp, ok := keys1[i].Compare(keys2[i]); ok && cmp != 0 {
+	pairs1 := m1.sortedPairs()
+	pairs2 := m2.sortedPairs()
+	for i := 0; i < len(pairs1) && i < len(pairs2); i++ {
+		if cmp, ok := pairs1[i][0].Compare(pairs2[i][0]); ok && cmp != 0 {
 			return cmp
 		}
-		val1, _ := m1.Get(keys1[i])
-		val2, _ := m2.Get(keys2[i])
-		if cmp, ok := val1.Compare(val2); ok && cmp != 0 {
+		if cmp, ok := pairs1[i][1].Compare(pairs2[i][1]); ok && cmp != 0 {
 			return cmp
 		}
 	}
-	return cmp.Compare(len(keys1), len(keys2))
+	return cmp.Compare(len(pairs1), len(pairs2))
 }
 
 // Contains checks if v contains other.

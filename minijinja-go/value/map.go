@@ -354,10 +354,21 @@ func (m *Map) stringMap() map[string]Value {
 	return rv
 }
 
-// sortMapKeys sorts keys like MiniJinja for Rust orders values.
-func sortMapKeys(keys []Value) {
-	sort.SliceStable(keys, func(i, j int) bool {
-		cmp, ok := keys[i].Compare(keys[j])
+// sortPairs sorts key-value pairs by their keys like MiniJinja for Rust
+// orders values.
+func sortPairs(pairs [][2]Value) {
+	sort.SliceStable(pairs, func(i, j int) bool {
+		cmp, ok := pairs[i][0].Compare(pairs[j][0])
 		return ok && cmp < 0
 	})
+}
+
+// sortedPairs returns the key-value pairs of the map sorted by key.
+func (m *Map) sortedPairs() [][2]Value {
+	pairs := make([][2]Value, m.Len())
+	for i := range pairs {
+		pairs[i] = [2]Value{m.keys[i], m.values[i]}
+	}
+	sortPairs(pairs)
+	return pairs
 }

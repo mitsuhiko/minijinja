@@ -2700,15 +2700,17 @@ func FilterChain(state State, val value.Value, args []value.Value, _ map[string]
 				union.Set(k, v)
 			}
 		}
-		keys := union.Keys()
-		sort.SliceStable(keys, func(i, j int) bool {
-			cmp, ok := keys[i].Compare(keys[j])
+		pairs := make([][2]value.Value, 0, union.Len())
+		for k, v := range union.All() {
+			pairs = append(pairs, [2]value.Value{k, v})
+		}
+		sort.SliceStable(pairs, func(i, j int) bool {
+			cmp, ok := pairs[i][0].Compare(pairs[j][0])
 			return ok && cmp < 0
 		})
 		merged := value.NewMap()
-		for _, k := range keys {
-			v, _ := union.Get(k)
-			merged.Set(k, v)
+		for _, pair := range pairs {
+			merged.Set(pair[0], pair[1])
 		}
 		return value.FromValueMap(merged), nil
 	}

@@ -285,3 +285,17 @@ func TestMergeMapsWithValueMap(t *testing.T) {
 		t.Errorf("unexpected merged map %s", got)
 	}
 }
+
+func TestFromAnyNaNKeys(t *testing.T) {
+	// NaN keys cannot be looked up, so they must not get lost while
+	// sorting.
+	m, _ := FromAny(map[float64]int{math.NaN(): 1, math.NaN(): 1, 0.5: 2}).AsValueMap()
+	if m.Len() != 3 {
+		t.Fatalf("unexpected length %d", m.Len())
+	}
+	for k, v := range m.All() {
+		if v.IsUndefined() {
+			t.Errorf("value of %s got lost", k.Repr())
+		}
+	}
+}
