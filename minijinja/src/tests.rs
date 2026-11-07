@@ -105,7 +105,7 @@ mod builtins {
 
     use std::borrow::Cow;
 
-    use crate::value::ops::{coerce, CoerceResult, WideInt};
+    use crate::value::ops::{coerce, rem, CoerceResult, WideInt};
     use crate::value::ValueKind;
 
     /// Return true if the object is a boolean value.
@@ -157,9 +157,16 @@ mod builtins {
     /// ```jinja
     /// {{ 42 is divisibleby(2) }} -> true
     /// ```
+    ///
+    /// Like `%`, this fails if a number is divided by zero.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_divisibleby(v: &Value, other: &Value) -> bool {
-        match coerce(v, other, false) {
+    pub fn is_divisibleby(v: &Value, other: &Value) -> Result<bool, Error> {
+        let is_numeric = |v: &Value| matches!(v.kind(), ValueKind::Number | ValueKind::Bool);
+        if is_numeric(v) && is_numeric(other) && !other.is_true() {
+            // Like `%` and like in Jinja2, dividing by zero is an error.
+            return rem(v, other).map(|_| false);
+        }
+        Ok(match coerce(v, other, false) {
             // `wrapping_rem` only wraps for `i128::MIN % -1`, which is 0.
             Some(CoerceResult::I128(a, b)) => b != 0 && a.wrapping_rem(b) == 0,
             Some(CoerceResult::F64(a, b)) => (a % b) == 0.0,
@@ -168,7 +175,7 @@ mod builtins {
                 (Some(a), Some(b)) => a.div_rem_floor(b).is_some_and(|(_, rem)| rem.is_zero()),
                 _ => false,
             },
-        }
+        })
     }
 
     /// Checks if this value is a number.

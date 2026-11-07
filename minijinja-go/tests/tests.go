@@ -245,15 +245,10 @@ func TestDivisibleBy(_ filters.State, val value.Value, args []value.Value) (bool
 	if !isNumberOrBool(val) || !isNumberOrBool(divisor) {
 		return false, nil
 	}
-	if f, ok := divisor.AsFloat(); ok && f == 0 {
-		return false, nil
-	}
-	if b, ok := divisor.AsBool(); ok && !b {
-		return false, nil
-	}
+	// Like `%` and like in Jinja2, dividing by zero is an error.
 	rem, err := val.Rem(divisor)
 	if err != nil {
-		return false, nil
+		return false, mjerrors.NewError(mjerrors.ErrInvalidOperation, err.Error())
 	}
 	return rem.Equal(value.FromInt(0)), nil
 }

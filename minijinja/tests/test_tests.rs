@@ -1,6 +1,6 @@
 use similar_asserts::assert_eq;
 
-use minijinja::{args, Environment, State};
+use minijinja::{args, Environment, ErrorKind, State};
 
 #[test]
 fn test_basics() {
@@ -41,12 +41,29 @@ fn test_number_tests_integer_range() {
     let env = Environment::new();
     let render = |src: &str| env.render_str(src, ()).unwrap();
 
-    // dividing by zero is not divisible rather than a panic
-    assert_eq!(render("{{ 5 is divisibleby 0 }}"), "False");
-    assert_eq!(
-        render("{{ 340282366920938463463374607431768211455 is divisibleby 0 }}"),
-        "False"
-    );
+    // dividing by zero is an error like for `%` rather than a panic
+    for (expr, rem) in [
+        ("5 is divisibleby 0", "5 % 0"),
+        ("5 is divisibleby 0.0", "5 % 0.0"),
+        ("5 is divisibleby false", "5 % False"),
+        ("5.5 is divisibleby 0", "5.5 % 0"),
+        (
+            "340282366920938463463374607431768211455 is divisibleby 0",
+            "340282366920938463463374607431768211455 % 0",
+        ),
+    ] {
+        let err = env
+            .render_str(&format!("{{{{ {expr} }}}}"), ())
+            .unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::InvalidOperation);
+        assert_eq!(
+            err.detail(),
+            Some(format!("unable to calculate {rem}").as_str())
+        );
+    }
+    // values that are not numbers are still just not divisible
+    assert_eq!(render("{{ 'a' is divisibleby 0 }}"), "False");
+    assert_eq!(render("{{ none is divisibleby 0 }}"), "False");
     // i128::MIN % -1 overflows an i128
     assert_eq!(
         render("{{ (-170141183460469231731687303715884105727 - 1) is divisibleby -1 }}"),

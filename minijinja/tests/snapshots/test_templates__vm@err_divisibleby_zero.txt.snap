@@ -1,0 +1,22 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{{ 10 is divisibleby 0 }}"
+info: {}
+input_file: minijinja/tests/inputs/err_divisibleby_zero.txt
+---
+!!!ERROR!!!
+
+Error {
+    kind: InvalidOperation,
+    detail: "unable to calculate 10 % 0",
+    name: "err_divisibleby_zero.txt",
+    line: 1,
+}
+
+invalid operation: unable to calculate 10 % 0 (in err_divisibleby_zero.txt:1)
+-------------------------- err_divisibleby_zero.txt ---------------------------
+   1 > {{ 10 is divisibleby 0 }}
+     i          ^^^^^^^^^^^^^ invalid operation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+No referenced variables
+-------------------------------------------------------------------------------
