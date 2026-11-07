@@ -836,3 +836,37 @@ fn test_replace_count_errors() {
         assert!(rv.to_string().contains(err), "{source}: {rv}");
     }
 }
+
+#[test]
+fn test_case_conversions() {
+    let env = Environment::new();
+    let mut state = env.empty_state();
+    for (filter, input, expected) in [
+        ("title", "", ""),
+        ("title", " -( ", " -( "),
+        ("title", "hello wORLD", "Hello World"),
+        ("title", "éCOLE straße", "École Straße"),
+        ("title", "aİ", "Ai\u{307}"),
+        ("title", "ß ﬁre", "SS FIre"),
+        ("title", "ΑΣ", "Ας"),
+        ("title", "ΣΑΣΑ", "Σασα"),
+        ("title", "ΟΔΟΣ\u{301} ΟΔΟΣA", "Οδος\u{301} Οδοσa"),
+        ("capitalize", "", ""),
+        ("capitalize", "ΑΣ", "Ας"),
+        ("capitalize", "ß", "Ss"),
+        ("capitalize", "Ǆ", "ǅ"),
+        ("capitalize", "ﬃX", "Ffix"),
+        ("capitalize", "ა", "ა"),
+        ("capitalize", "ᾀ", "ᾈ"),
+        ("capitalize", "ᾷ", "Α\u{342}\u{345}"),
+        ("upper", "ß", "SS"),
+        ("upper", "ᾳ", "ΑΙ"),
+        ("lower", "İ", "i\u{307}"),
+        ("lower", "ΑΣ", "ας"),
+        ("lower", "Σ", "σ"),
+        ("lower", "ΟΔΟΣ\u{301} ΟΔΟΣA", "οδος\u{301} οδοσa"),
+    ] {
+        let rv = state.apply_filter(filter, args!(input)).unwrap();
+        assert_eq!(rv.as_str(), Some(expected), "{filter}({input:?})");
+    }
+}

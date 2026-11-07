@@ -147,3 +147,47 @@ func TestGroupByTies(t *testing.T) {
 		})
 	}
 }
+
+func TestCaseConversions(t *testing.T) {
+	filters := map[string]func(State, value.Value, []value.Value, map[string]value.Value) (value.Value, error){
+		"upper":      FilterUpper,
+		"lower":      FilterLower,
+		"capitalize": FilterCapitalize,
+		"title":      FilterTitle,
+	}
+	for _, tc := range []struct {
+		filter, input, want string
+	}{
+		{"title", "", ""},
+		{"title", " -( ", " -( "},
+		{"title", "hello wORLD", "Hello World"},
+		{"title", "éCOLE straße", "École Straße"},
+		{"title", "aİ", "Ai\u0307"},
+		{"title", "ß ﬁre", "SS FIre"},
+		{"title", "ΑΣ", "Ας"},
+		{"title", "ΣΑΣΑ", "Σασα"},
+		{"title", "ΟΔΟΣ\u0301 ΟΔΟΣA", "Οδος\u0301 Οδοσa"},
+		{"capitalize", "", ""},
+		{"capitalize", "ΑΣ", "Ας"},
+		{"capitalize", "ß", "Ss"},
+		{"capitalize", "Ǆ", "ǅ"},
+		{"capitalize", "ﬃX", "Ffix"},
+		{"capitalize", "ა", "ა"},
+		{"capitalize", "ᾀ", "ᾈ"},
+		{"capitalize", "ᾷ", "Α\u0342\u0345"},
+		{"upper", "ß", "SS"},
+		{"upper", "ᾳ", "ΑΙ"},
+		{"lower", "İ", "i\u0307"},
+		{"lower", "ΑΣ", "ας"},
+		{"lower", "Σ", "σ"},
+		{"lower", "ΟΔΟΣ\u0301 ΟΔΟΣA", "οδος\u0301 οδοσa"},
+	} {
+		got, err := filters[tc.filter](nil, value.FromString(tc.input), nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if s, _ := got.AsString(); s != tc.want {
+			t.Errorf("%s(%q) = %q, want %q", tc.filter, tc.input, s, tc.want)
+		}
+	}
+}

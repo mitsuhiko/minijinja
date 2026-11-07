@@ -237,7 +237,7 @@ func FilterUpper(state State, val value.Value, _ []value.Value, _ map[string]val
 	if err != nil {
 		return value.Undefined(), err
 	}
-	return preserveSafety(val, strings.ToUpper(s)), nil
+	return preserveSafety(val, toUpper(s)), nil
 }
 
 // FilterLower converts a value to lowercase.
@@ -257,14 +257,16 @@ func FilterLower(state State, val value.Value, _ []value.Value, _ map[string]val
 	if err != nil {
 		return value.Undefined(), err
 	}
-	return preserveSafety(val, strings.ToLower(s)), nil
+	return preserveSafety(val, toLower(s)), nil
 }
 
 // FilterCapitalize converts the first character to uppercase and the rest to lowercase.
 //
 // This filter converts a string by uppercasing only the first character and
 // lowercasing all remaining characters. This is different from FilterTitle which
-// capitalizes the first letter of each word.
+// capitalizes the first letter of each word.  Like in Python, the first
+// character is converted to its titlecase form, so "ǆ" becomes "ǅ" and "ß"
+// becomes "Ss".
 //
 // Example:
 //
@@ -280,12 +282,13 @@ func FilterCapitalize(state State, val value.Value, _ []value.Value, _ map[strin
 	if err != nil {
 		return value.Undefined(), err
 	}
-	runes := []rune(s)
-	output := ""
-	if len(runes) > 0 {
-		output = strings.ToUpper(string(runes[0])) + strings.ToLower(string(runes[1:]))
+	var output strings.Builder
+	if first, size := utf8.DecodeRuneInString(s); size > 0 {
+		output.Grow(len(s))
+		writeTitle(&output, first)
+		writeLowerTail(&output, s, size)
 	}
-	return preserveSafety(val, output), nil
+	return preserveSafety(val, output.String()), nil
 }
 
 // FilterTitle converts a value to title case.
@@ -310,19 +313,53 @@ func FilterTitle(state State, val value.Value, _ []value.Value, _ map[string]val
 		return value.Undefined(), err
 	}
 	var result strings.Builder
+	result.Grow(len(s))
 	capitalizeNext := true
-	for _, r := range s {
-		if unicode.IsSpace(r) || r == '-' || r == '(' || r == '{' || r == '[' || r == '<' {
+	skipUntil := 0
+	for i, r := range s {
+		if i < skipUntil {
+			continue
+		}
+		if isTitleWordSeparator(r) {
 			capitalizeNext = true
 			result.WriteRune(r)
 		} else if capitalizeNext {
-			result.WriteRune(unicode.ToUpper(r))
+			writeUpper(&result, r)
 			capitalizeNext = false
+		} else if r < utf8.RuneSelf {
+			if 'A' <= r && r <= 'Z' {
+				r += 'a' - 'A'
+			}
+			result.WriteByte(byte(r))
+		} else if r == 'Σ' {
+			// Whether a capital sigma lowercases to a final sigma depends
+			// on the rest of the word, so lowercase the rest of the word
+			// at once.
+			wordStart := strings.LastIndexFunc(s[:i], isTitleWordSeparator)
+			if wordStart >= 0 {
+				_, size := utf8.DecodeRuneInString(s[wordStart:])
+				wordStart += size
+			} else {
+				wordStart = 0
+			}
+			wordEnd := strings.IndexFunc(s[i:], isTitleWordSeparator)
+			if wordEnd < 0 {
+				wordEnd = len(s)
+			} else {
+				wordEnd += i
+			}
+			writeLowerTail(&result, s[wordStart:wordEnd], i-wordStart)
+			skipUntil = wordEnd
 		} else {
-			result.WriteRune(unicode.ToLower(r))
+			writeLowerRune(&result, r)
 		}
 	}
 	return value.FromString(result.String()), nil
+}
+
+// isTitleWordSeparator reports whether r starts a new word for FilterTitle.
+func isTitleWordSeparator(r rune) bool {
+	return unicode.IsSpace(r) || r == '-' || r == '(' || r == '{' || r == '[' || r == '<'
 }
 
 // FilterTrim strips leading and trailing characters from a string.
