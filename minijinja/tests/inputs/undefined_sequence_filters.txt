@@ -1,0 +1,10 @@
+{}
+---
+first: [{{ undefined|first }}] {{ undefined|first is undefined }}
+last: [{{ undefined|last }}] {{ undefined|last is undefined }}
+reverse: [{{ undefined|reverse }}] {{ undefined|reverse|list }}
+length: {{ undefined|length }} {{ undefined|count }}
+items: {{ undefined|items|list }}
+join: [{{ undefined|join(",") }}]
+groupby: {{ undefined|groupby("x")|list }}
+loop: {% for x in undefined|reverse %}{{ x }}{% else %}empty{% endfor %}

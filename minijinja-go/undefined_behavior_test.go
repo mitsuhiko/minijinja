@@ -3,6 +3,7 @@ package minijinja
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/mitsuhiko/minijinja/minijinja-go/v3/value"
@@ -169,6 +170,51 @@ func TestUndefinedInStringFiltersInStrictModes(t *testing.T) {
 	assertRender(t, env, "{{ (undefined|indent(2)) is defined }}", nil, "True")
 	assertRender(t, env, "{{ 5|indent(2, true) }}", nil, "  5")
 	assertRender(t, env, "{{ [1, 2]|indent(2, true) }}", nil, "  [1, 2]")
+}
+
+func TestUndefinedInSequenceFilters(t *testing.T) {
+	// Like in Jinja2, undefined values behave like empty sequences in these
+	// filters unless strict undefined behavior is used.
+	tests := []struct {
+		expr     string
+		expected string
+	}{
+		{"undefined|first is undefined", "True"},
+		{"undefined|last is undefined", "True"},
+		{"undefined|reverse|list", "[]"},
+		{"undefined|length", "0"},
+		{"undefined|count", "0"},
+		{"undefined|items|list", "[]"},
+		{"undefined|join(',')", ""},
+		{"undefined|groupby('x')|list", "[]"},
+	}
+
+	for _, behavior := range []UndefinedBehavior{UndefinedLenient, UndefinedChainable} {
+		env := NewEnvironment()
+		env.SetUndefinedBehavior(behavior)
+		for _, test := range tests {
+			assertRender(t, env, "{{ "+test.expr+" }}", nil, test.expected)
+		}
+	}
+
+	for _, behavior := range []UndefinedBehavior{UndefinedSemiStrict, UndefinedStrict} {
+		env := NewEnvironment()
+		env.SetUndefinedBehavior(behavior)
+		for _, test := range tests {
+			assertRenderErrorKind(t, env, "{{ "+test.expr+" }}", nil, ErrUndefinedVar)
+			// silent undefined values are still accepted
+			silent := "{% set silent = 42 if false %}{{ " + strings.Replace(test.expr, "undefined", "silent", 1) + " }}"
+			assertRender(t, env, silent, nil, test.expected)
+		}
+	}
+}
+
+func TestReverseNone(t *testing.T) {
+	// Like in Jinja2 none cannot be reversed, even though it iterates as an
+	// empty sequence elsewhere.
+	env := NewEnvironment()
+	assertRenderErrorKind(t, env, "{{ none|reverse }}", nil, ErrInvalidOperation)
+	assertRender(t, env, "{{ none|list }}", nil, "[]")
 }
 
 func TestChainableUndefinedBehavior(t *testing.T) {

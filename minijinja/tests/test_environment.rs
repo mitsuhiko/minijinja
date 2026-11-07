@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+#[cfg(feature = "builtins")]
 use insta::assert_snapshot;
 use similar_asserts::assert_eq;
 
@@ -122,10 +123,12 @@ fn test_globals() {
     env.add_template("test", "{{ a }}").unwrap();
     let tmpl = env.get_template("test").unwrap();
     assert_eq!(tmpl.render(()).unwrap(), "42");
-    assert_eq!(
-        env.globals().map(|x| x.0).collect::<Vec<_>>(),
-        vec!["a", "debug", "dict", "namespace", "range"]
-    );
+    let globals = env.globals().map(|x| x.0).collect::<Vec<_>>();
+    // the default globals are only registered with the builtins feature
+    #[cfg(feature = "builtins")]
+    assert_eq!(globals, vec!["a", "debug", "dict", "namespace", "range"]);
+    #[cfg(not(feature = "builtins"))]
+    assert_eq!(globals, vec!["a"]);
 }
 
 #[test]

@@ -81,14 +81,14 @@ fn build_builtin_filters() -> BTreeMap<Cow<'static, str>, Value> {
             "replace".into(),
             Value::from_function(filters::replace_with_kwargs),
         );
-        let length = Value::from_function(filters::length);
+        let length = Value::from_function(filters::length_checked);
         rv.insert("length".into(), length.clone());
         rv.insert("count".into(), length);
         rv.insert(
             "dictsort".into(),
             Value::from_function(filters::dictsort_fueled),
         );
-        rv.insert("items".into(), Value::from_function(filters::items));
+        rv.insert("items".into(), Value::from_function(filters::items_checked));
         rv.insert(
             "reverse".into(),
             Value::from_function(filters::reverse_fueled),
@@ -104,7 +104,7 @@ fn build_builtin_filters() -> BTreeMap<Cow<'static, str>, Value> {
         rv.insert("int".into(), Value::from_function(filters::int));
         rv.insert("float".into(), Value::from_function(filters::float));
         rv.insert("attr".into(), Value::from_function(filters::attr));
-        rv.insert("first".into(), Value::from_function(filters::first));
+        rv.insert("first".into(), Value::from_function(filters::first_checked));
         rv.insert("last".into(), Value::from_function(filters::last_fueled));
         rv.insert("min".into(), Value::from_function(filters::min));
         rv.insert("max".into(), Value::from_function(filters::max));

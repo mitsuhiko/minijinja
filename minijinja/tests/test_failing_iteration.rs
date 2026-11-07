@@ -1,5 +1,7 @@
 use minijinja::value::Value;
-use minijinja::{context, Environment, Error, ErrorKind};
+#[cfg(feature = "builtins")]
+use minijinja::{context, Environment};
+use minijinja::{Error, ErrorKind};
 
 /// An iterable that yields `n` items and then fails with an invalid value.
 fn failing_iterable(n: usize) -> Value {
@@ -17,11 +19,13 @@ fn failing_iterable(n: usize) -> Value {
     })
 }
 
+#[cfg(feature = "builtins")]
 fn render(source: &str, items: Value) -> Result<String, Error> {
     let env = Environment::new();
     env.render_str(source, context!(items))
 }
 
+#[cfg(feature = "builtins")]
 fn assert_fails(source: &str, items: Value) {
     match render(source, items) {
         Ok(rv) => panic!("expected {source:?} to fail, got {rv:?}"),
@@ -32,6 +36,7 @@ fn assert_fails(source: &str, items: Value) {
     }
 }
 
+#[cfg(feature = "builtins")]
 #[test]
 fn test_failing_iteration_in_templates() {
     for source in [
@@ -66,7 +71,7 @@ fn test_failing_iteration_in_templates() {
     }
 }
 
-#[cfg(feature = "json")]
+#[cfg(all(feature = "builtins", feature = "json"))]
 #[test]
 fn test_failing_iteration_tojson() {
     let err = render("{{ items|tojson }}", failing_iterable(2)).unwrap_err();
@@ -77,6 +82,7 @@ fn test_failing_iteration_tojson() {
     );
 }
 
+#[cfg(feature = "builtins")]
 #[test]
 fn test_failing_iteration_is_lazy() {
     // only the items that are needed are consumed, so these do not fail
