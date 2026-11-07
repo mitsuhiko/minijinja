@@ -156,3 +156,122 @@ func TestCompareMapsByValueKeys(t *testing.T) {
 		t.Errorf("numbers should sort before strings")
 	}
 }
+
+func TestMapNaNKeys(t *testing.T) {
+	// Like in Rust and Python, NaN is not equal to itself, so every NaN is
+	// a new key that cannot be looked up.
+	m := NewMap()
+	m.Set(FromFloat(math.NaN()), FromInt(1))
+	m.Set(FromFloat(math.NaN()), FromInt(2))
+	m.Set(FromSlice([]Value{FromFloat(math.NaN())}), FromInt(3))
+	m.Set(FromSlice([]Value{FromFloat(math.NaN())}), FromInt(4))
+	if m.Len() != 4 {
+		t.Errorf("unexpected length %d", m.Len())
+	}
+	if _, ok := m.Get(FromFloat(math.NaN())); ok {
+		t.Errorf("NaN key unexpectedly found")
+	}
+}
+
+func TestMapCompositeKeys(t *testing.T) {
+	list := func(items ...Value) Value { return FromSlice(items) }
+	tuple := func(items ...Value) Value { return FromTuple(items) }
+	strMap := FromMap(map[string]Value{"a": FromInt(1), "b": list(FromInt(2))})
+	valMap := NewMap()
+	valMap.Set(FromString("b"), tuple(FromInt(2)))
+	valMap.Set(FromString("a"), True())
+
+	m := NewMap()
+	m.Set(list(FromInt(1), list(FromString("x"))), FromString("list"))
+	m.Set(tuple(FromInt(1), FromInt(2)), FromString("tuple"))
+	m.Set(strMap, FromString("strmap"))
+	m.Set(FromValueMap(valMap), FromString("valmap"))
+	m.Set(list(), FromString("empty"))
+
+	for _, tc := range []struct {
+		key  Value
+		want string
+	}{
+		{list(True(), list(FromSafeString("x"))), "list"},
+		{FromIterator(NewIterator("test", []Value{FromFloat(1), list(FromString("x"))})), "list"},
+		{tuple(True(), FromFloat(2)), "tuple"},
+		{FromValueMap(valMap.Clone()), "valmap"},
+		{list(), "empty"},
+		// a map with value keys equal to a Go map
+		{FromValueMap(func() *Map {
+			rv := NewMap()
+			rv.Set(FromString("b"), list(FromFloat(2)))
+			rv.Set(FromString("a"), FromInt(1))
+			return rv
+		}()), "strmap"},
+		// sequence objects are equal to lists with the same items
+		{FromObject(&testSeq{items: []Value{FromInt(1), list(FromString("x"))}}), "list"},
+	} {
+		got, ok := m.Get(tc.key)
+		if !ok || got.String() != tc.want {
+			t.Errorf("Get(%s) = %s, %v; want %s", tc.key.Repr(), got.Repr(), ok, tc.want)
+		}
+	}
+	for _, key := range []Value{
+		list(FromInt(1), FromInt(2)), // a list is not equal to a tuple
+		tuple(FromInt(1), list(FromString("x"))),
+		list(FromInt(1), list(FromBytes([]byte("x")))),
+		tuple(),
+		list(list()),
+		FromObject(&testSeq{items: []Value{FromInt(1), FromInt(2)}}),
+	} {
+		if v, ok := m.Get(key); ok {
+			t.Errorf("Get(%s) unexpectedly found %s", key.Repr(), v.Repr())
+		}
+	}
+
+	// objects are stored as opaque keys and found by lists and objects
+	obj := NewMap()
+	obj.Set(FromObject(&testSeq{items: []Value{FromInt(1)}}), FromString("obj"))
+	obj.Set(list(FromFloat(1)), FromString("replaced"))
+	obj.Set(FromObject(&testSeq{items: []Value{FromInt(2)}}), FromString("obj2"))
+	if obj.Len() != 2 {
+		t.Fatalf("unexpected length %d", obj.Len())
+	}
+	if v, ok := obj.Get(list(True())); !ok || v.String() != "replaced" {
+		t.Errorf("list did not find the equal object key: %s %v", v.Repr(), ok)
+	}
+	if v, ok := obj.Get(FromObject(&testSeq{items: []Value{FromInt(2)}})); !ok || v.String() != "obj2" {
+		t.Errorf("object key not found: %s %v", v.Repr(), ok)
+	}
+	if _, ok := obj.Get(FromInt(1)); ok {
+		t.Errorf("primitive keys should not be equal to objects")
+	}
+}
+
+func TestMapZeroValue(t *testing.T) {
+	var m Map
+	if _, ok := m.Get(FromInt(1)); ok || m.Len() != 0 {
+		t.Fatalf("zero map should be empty")
+	}
+	m.Set(FromInt(1), FromString("a"))
+	if v, ok := m.Get(True()); !ok || v.String() != "a" {
+		t.Errorf("unexpected value %s %v", v.Repr(), ok)
+	}
+	if got := FromValueMap(&m).GetAttr("x"); !got.IsUndefined() {
+		t.Errorf("unexpected attribute %s", got.Repr())
+	}
+}
+
+func TestFromAnyValueMap(t *testing.T) {
+	m := NewMap()
+	m.Set(FromInt(2), FromString("b"))
+	m.Set(FromString("a"), FromInt(1))
+	for _, val := range []Value{
+		FromAny(m),
+		FromAny(map[string]any{"m": m}).GetAttr("m"),
+		FromAny([]any{m}).GetItem(FromInt(0)),
+	} {
+		if got := val.Repr(); got != "{2: 'b', 'a': 1}" {
+			t.Errorf("unexpected repr %s", got)
+		}
+	}
+	if !FromAny((*Map)(nil)).IsNone() {
+		t.Errorf("a nil map should be none")
+	}
+}

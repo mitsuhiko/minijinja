@@ -1,6 +1,7 @@
 package value
 
 import (
+	"encoding/binary"
 	"iter"
 	"math"
 	"math/big"
@@ -24,11 +25,12 @@ import (
 type Map struct {
 	keys   []Value
 	values []Value
-	// index maps the canonical form of a hashable key to its position.
+	// index maps the canonical form of a key to its position.
 	index map[mapKey]int
-	// complex holds the positions of keys that have no canonical form
-	// (sequences, maps and objects).  They are compared with Equal.
-	complex []int
+	// opaque holds the positions of keys that have no canonical form
+	// (objects, NaN and sequences or maps containing them).  They are
+	// compared with Equal.
+	opaque []int
 }
 
 // NewMap creates an empty [Map].
@@ -90,9 +92,12 @@ func (m *Map) Set(key, val Value) {
 	m.keys = append(m.keys, key)
 	m.values = append(m.values, val)
 	if mk, ok := canonicalMapKey(key); ok {
+		if m.index == nil {
+			m.index = make(map[mapKey]int)
+		}
 		m.index[mk] = idx
 	} else {
-		m.complex = append(m.complex, idx)
+		m.opaque = append(m.opaque, idx)
 	}
 }
 
@@ -145,7 +150,7 @@ func (m *Map) Clone() *Map {
 	for k, idx := range m.index {
 		rv.index[k] = idx
 	}
-	rv.complex = append(rv.complex, m.complex...)
+	rv.opaque = append(rv.opaque, m.opaque...)
 	return rv
 }
 
@@ -153,16 +158,41 @@ func (m *Map) find(key Value) (int, bool) {
 	if m == nil {
 		return 0, false
 	}
-	if mk, ok := canonicalMapKey(key); ok {
-		idx, found := m.index[mk]
-		return idx, found
+	mk, ok := canonicalMapKey(key)
+	if !ok {
+		// Opaque keys (such as objects) can be equal to any sequence or
+		// map key, so they are compared with all keys.
+		for idx, k := range m.keys {
+			if k.Equal(key) {
+				return idx, true
+			}
+		}
+		return 0, false
 	}
-	for _, idx := range m.complex {
-		if m.keys[idx].Equal(key) {
-			return idx, true
+	if idx, found := m.index[mk]; found {
+		return idx, true
+	}
+	// Primitive keys are never equal to opaque keys, but sequences and
+	// maps can be equal to objects.
+	if mk.kind == mapKeyComposite {
+		for _, idx := range m.opaque {
+			if m.keys[idx].Equal(key) {
+				return idx, true
+			}
 		}
 	}
 	return 0, false
+}
+
+// getString looks up a string key without creating a Value for it.
+func (m *Map) getString(key string) (Value, bool) {
+	if m == nil {
+		return Undefined(), false
+	}
+	if idx, ok := m.index[mapKey{kind: mapKeyString, s: key}]; ok {
+		return m.values[idx], true
+	}
+	return Undefined(), false
 }
 
 // mapKeyKind is the kind of a canonical map key.
@@ -176,11 +206,14 @@ const (
 	mapKeyBigInt
 	mapKeyString
 	mapKeyBytes
+	// mapKeyComposite is a sequence or map encoded with encodeMapKey.
+	mapKeyComposite
 )
 
-// mapKey is the canonical, comparable form of a primitive key.  Two keys
-// have the same canonical form exactly if they are equal values: booleans
-// and integral floats become integers, so true, 1 and 1.0 are one key.
+// mapKey is the canonical, comparable form of a key.  Two keys have the
+// same canonical form exactly if they are equal values: booleans and
+// integral floats become integers, so true, 1 and 1.0 are one key.
+// Sequences and maps are encoded from the canonical forms of their items.
 type mapKey struct {
 	kind mapKeyKind
 	n    uint64
@@ -188,7 +221,8 @@ type mapKey struct {
 }
 
 // canonicalMapKey returns the canonical form of a key.  It returns false for
-// keys without one (sequences, maps and objects).
+// keys without one: objects, which can implement their own equality, NaN,
+// which is not equal to itself, and sequences and maps containing them.
 func canonicalMapKey(v Value) (mapKey, bool) {
 	switch d := v.data.(type) {
 	case undefinedType:
@@ -200,7 +234,7 @@ func canonicalMapKey(v Value) (mapKey, bool) {
 	case int64:
 		return mapKey{kind: mapKeyInt, n: uint64(d)}, true
 	case float64:
-		return floatMapKey(d), true
+		return floatMapKey(d)
 	case bigIntValue:
 		if d.Int.IsInt64() {
 			return mapKey{kind: mapKeyInt, n: uint64(d.Int.Int64())}, true
@@ -208,7 +242,7 @@ func canonicalMapKey(v Value) (mapKey, bool) {
 		// A big integer that a float represents exactly is equal to that
 		// float, so it needs to have the same canonical form.
 		if f, acc := new(big.Float).SetInt(d.Int).Float64(); acc == big.Exact {
-			return floatMapKey(f), true
+			return floatMapKey(f)
 		}
 		return mapKey{kind: mapKeyBigInt, s: d.Int.String()}, true
 	case string:
@@ -217,18 +251,79 @@ func canonicalMapKey(v Value) (mapKey, bool) {
 		return mapKey{kind: mapKeyString, s: string(d)}, true
 	case []byte:
 		return mapKey{kind: mapKeyBytes, s: string(d)}, true
+	case []Value, tupleValue, *Iterator, map[string]Value, *Map:
+		buf, ok := encodeMapKey(nil, v)
+		if !ok {
+			return mapKey{}, false
+		}
+		return mapKey{kind: mapKeyComposite, s: string(buf)}, true
 	}
 	return mapKey{}, false
 }
 
-func floatMapKey(f float64) mapKey {
-	if f == math.Trunc(f) && f >= -(1<<63) && f < 1<<63 {
-		return mapKey{kind: mapKeyInt, n: uint64(int64(f))}
-	}
+func floatMapKey(f float64) (mapKey, bool) {
 	if math.IsNaN(f) {
-		f = math.NaN()
+		return mapKey{}, false
 	}
-	return mapKey{kind: mapKeyFloat, n: math.Float64bits(f)}
+	if f == math.Trunc(f) && f >= -(1<<63) && f < 1<<63 {
+		return mapKey{kind: mapKeyInt, n: uint64(int64(f))}, true
+	}
+	return mapKey{kind: mapKeyFloat, n: math.Float64bits(f)}, true
+}
+
+// encodeMapKey appends an encoding of a key to buf that is equal for two
+// keys exactly if they are equal values.  Like Equal, lists and iterables
+// with the same items are equal, but tuples are only equal to tuples, and
+// maps are equal if they have the same entries in any order.
+func encodeMapKey(buf []byte, v Value) ([]byte, bool) {
+	encodeItems := func(tag byte, items []Value) bool {
+		buf = append(buf, tag)
+		buf = binary.AppendUvarint(buf, uint64(len(items)))
+		for _, item := range items {
+			var ok bool
+			if buf, ok = encodeMapKey(buf, item); !ok {
+				return false
+			}
+		}
+		return true
+	}
+	switch d := v.data.(type) {
+	case []Value:
+		return buf, encodeItems('l', d)
+	case *Iterator:
+		return buf, encodeItems('l', d.items)
+	case tupleValue:
+		return buf, encodeItems('t', d)
+	case map[string]Value, *Map:
+		m, _ := v.AsValueMap()
+		entries := make([]string, 0, m.Len())
+		for i, k := range m.keys {
+			entry, ok := encodeMapKey(nil, k)
+			if !ok {
+				return nil, false
+			}
+			if entry, ok = encodeMapKey(entry, m.values[i]); !ok {
+				return nil, false
+			}
+			entries = append(entries, string(entry))
+		}
+		sort.Strings(entries)
+		buf = append(buf, 'm')
+		buf = binary.AppendUvarint(buf, uint64(len(entries)))
+		for _, entry := range entries {
+			buf = binary.AppendUvarint(buf, uint64(len(entry)))
+			buf = append(buf, entry...)
+		}
+		return buf, true
+	}
+	mk, ok := canonicalMapKey(v)
+	if !ok {
+		return nil, false
+	}
+	buf = append(buf, 'p', byte(mk.kind))
+	buf = binary.LittleEndian.AppendUint64(buf, mk.n)
+	buf = binary.AppendUvarint(buf, uint64(len(mk.s)))
+	return append(buf, mk.s...), true
 }
 
 // mapFromStringMap converts a Go map into a Map with sorted keys.

@@ -662,6 +662,7 @@ func FromObject(o Object) Value {
 //   - maps with string keys -> FromMap() (recursively)
 //   - maps with other keys -> FromValueMap() with the keys converted to
 //     values and sorted (recursively)
+//   - *Map -> FromValueMap()
 //   - structs -> FromMap() (using exported fields and json tags)
 //   - pointers/interfaces -> dereference and convert
 //
@@ -727,6 +728,11 @@ func fromReflectValue(rv reflect.Value) Value {
 			return val
 		case json.Number:
 			return fromJSONNumber(val)
+		case *Map:
+			if val == nil {
+				return None()
+			}
+			return FromValueMap(val)
 		}
 	}
 
@@ -1456,7 +1462,7 @@ func (v Value) GetAttr(name string) Value {
 			return val
 		}
 	case *Map:
-		if val, ok := d.Get(FromString(name)); ok {
+		if val, ok := d.getString(name); ok {
 			return val
 		}
 	case Object:
