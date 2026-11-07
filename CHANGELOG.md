@@ -41,6 +41,7 @@ All notable changes to MiniJinja are documented here.
 * The datetime filters in `minijinja-contrib` now fall back to jiff's bundled time zone database when a time zone name is missing from the system database.  Some systems such as Ubuntu 26.04 only ship legacy names like `EST` or `US/Eastern` in an optional package, so `tz="EST"` failed with "unknown timezone".  The system data still takes precedence; the fallback only applies if jiff's bundled data is compiled in (e.g. with `jiff/tzdb-bundle-always`).  `minijinja-cli` now always compiles it in.  #1008
 * Added the optional `count` argument to the `replace` filter in Rust.  Like in Jinja2, `"aaa"|replace("a", "b", 2)` is now `bba` instead of failing with too many arguments.  The count can also be passed as `count=` keyword argument in Rust and Go.  In Go, `replace` now converts the count like Rust: `true` counts as `1`, and counts that are not integers, extra arguments and unknown keyword arguments are errors instead of being ignored.  #1013
 * Fixed repeating a string or sequence a negative number of times failing in Rust and Go.  Like in Python, `"foo" * -1` is now an empty string and `[1, 2] * -1` an empty list.
+* Fixed repeating a safe string dropping its safety in Rust.  Like in Jinja2 and Go, `("<a>"|safe) * 2` is now not escaped again.
 
 ## 3.0.5
 

@@ -462,10 +462,10 @@ pub fn rem(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
 }
 
 pub fn mul(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
-    if let Some((s, n)) = lhs
+    if let Some((s, safe, n)) = lhs
         .as_str()
-        .map(|s| (s, rhs))
-        .or_else(|| rhs.as_str().map(|s| (s, lhs)))
+        .map(|s| (s, lhs.is_safe(), rhs))
+        .or_else(|| rhs.as_str().map(|s| (s, rhs.is_safe(), lhs)))
     {
         let n = ok!(repeat_count(n).ok_or_else(|| {
             Error::new(
@@ -479,7 +479,12 @@ pub fn mul(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
                 "repeated string is too large",
             ));
         }
-        return Ok(Value::from(s.repeat(n)));
+        let repeated = s.repeat(n);
+        return Ok(if safe {
+            Value::from_safe_string(repeated)
+        } else {
+            Value::from(repeated)
+        });
     } else if let Some((seq, n)) = lhs
         .as_object()
         .map(|s| (s, rhs))
