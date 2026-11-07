@@ -140,7 +140,9 @@
 //! - ``|`` (pipe, vertical bar): Applies a [filter](crate::filters).
 //! - ``~`` (tilde): Converts all operands into strings and concatenates them.
 //!   ``{{ "Hello " ~ name ~ "!" }}`` would return (assuming `name` is set
-//!   to ``'John'``) ``Hello John!``.
+//!   to ``'John'``) ``Hello John!``.  With auto escaping enabled, combining a
+//!   [safe](crate::filters::safe) string with another value escapes that value
+//!   and returns a safe string.  The same applies to ``+`` on two strings.
 //! - ``()``: Call a callable: ``{{ super() }}``.  Inside of the parentheses you
 //!   can use positional arguments.  Additionally keyword arguments are supported
 //!   which are treated like a dict syntax.  Eg: `foo(a=1, b=2)` is the same as

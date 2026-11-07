@@ -385,6 +385,56 @@ fn test_abs_overflow() {
 }
 
 #[test]
+fn test_min_max_ties_return_first() {
+    let env = Environment::new();
+    for (expr, expected) in [
+        ("[true, 1]|max", Value::from(true)),
+        ("[true, 1]|min", Value::from(true)),
+        ("[1, 1.0]|max", Value::from(1)),
+        ("[1.0, 1]|min", Value::from(1.0)),
+        ("['a', 'A']|max", Value::from("a")),
+        ("['A', 'a']|min", Value::from("A")),
+        (
+            "[{'k': 1, 'n': 'x'}, {'k': 1, 'n': 'y'}]|max(attribute='k')",
+            Value::from("x"),
+        ),
+        (
+            "[{'k': 'a', 'n': 'x'}, {'k': 'A', 'n': 'y'}]|min(attribute='k')",
+            Value::from("x"),
+        ),
+    ] {
+        let mut rv = env.compile_expression(expr).unwrap().eval(()).unwrap();
+        if rv.kind() == ValueKind::Map {
+            rv = rv.get_attr("n").unwrap();
+        }
+        assert_eq!(rv.kind(), expected.kind(), "{expr}");
+        assert_eq!(rv.to_string(), expected.to_string(), "{expr}");
+    }
+}
+
+#[test]
+fn test_groupby_ties_use_first_key() {
+    let env = Environment::new();
+    for (expr, expected) in [
+        ("[{'a': true}, {'a': 1}]|groupby('a')", Value::from(true)),
+        ("[{'a': 1}, {'a': 1.0}]|groupby('a')", Value::from(1)),
+        ("[{'a': 1.0}, {'a': 1}]|groupby('a')", Value::from(1.0)),
+        ("[{'a': 'x'}, {'a': 'X'}]|groupby('a')", Value::from("x")),
+        ("[{'a': 'X'}, {'a': 'x'}]|groupby('a')", Value::from("X")),
+    ] {
+        let rv = env.compile_expression(expr).unwrap().eval(()).unwrap();
+        assert_eq!(rv.len(), Some(1), "{expr}");
+        let grouper = rv
+            .get_item_by_index(0)
+            .unwrap()
+            .get_item_by_index(0)
+            .unwrap();
+        assert_eq!(grouper.kind(), expected.kind(), "{expr}");
+        assert_eq!(grouper.to_string(), expected.to_string(), "{expr}");
+    }
+}
+
+#[test]
 fn test_chain_lists() {
     let env = Environment::new();
     let tmpl = env
@@ -784,5 +834,39 @@ fn test_replace_count_errors() {
     ] {
         let rv = env.render_str(source, ()).unwrap_err();
         assert!(rv.to_string().contains(err), "{source}: {rv}");
+    }
+}
+
+#[test]
+fn test_case_conversions() {
+    let env = Environment::new();
+    let mut state = env.empty_state();
+    for (filter, input, expected) in [
+        ("title", "", ""),
+        ("title", " -( ", " -( "),
+        ("title", "hello wORLD", "Hello World"),
+        ("title", "éCOLE straße", "École Straße"),
+        ("title", "aİ", "Ai\u{307}"),
+        ("title", "ß ﬁre", "SS FIre"),
+        ("title", "ΑΣ", "Ας"),
+        ("title", "ΣΑΣΑ", "Σασα"),
+        ("title", "ΟΔΟΣ\u{301} ΟΔΟΣA", "Οδος\u{301} Οδοσa"),
+        ("capitalize", "", ""),
+        ("capitalize", "ΑΣ", "Ας"),
+        ("capitalize", "ß", "Ss"),
+        ("capitalize", "Ǆ", "ǅ"),
+        ("capitalize", "ﬃX", "Ffix"),
+        ("capitalize", "ა", "ა"),
+        ("capitalize", "ᾀ", "ᾈ"),
+        ("capitalize", "ᾷ", "Α\u{342}\u{345}"),
+        ("upper", "ß", "SS"),
+        ("upper", "ᾳ", "ΑΙ"),
+        ("lower", "İ", "i\u{307}"),
+        ("lower", "ΑΣ", "ας"),
+        ("lower", "Σ", "σ"),
+        ("lower", "ΟΔΟΣ\u{301} ΟΔΟΣA", "οδος\u{301} οδοσa"),
+    ] {
+        let rv = state.apply_filter(filter, args!(input)).unwrap();
+        assert_eq!(rv.as_str(), Some(expected), "{filter}({input:?})");
     }
 }

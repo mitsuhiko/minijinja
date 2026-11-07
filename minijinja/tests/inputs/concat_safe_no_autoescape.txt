@@ -1,0 +1,7 @@
+{
+  "a": "<a>"
+}
+---
+{%- set s = "<s>"|safe -%}
+{{ a ~ s }}|{{ s ~ a }}|{{ a + s }}|{{ s + a }}
+{{ (a ~ s)|escape }}|{{ (s + a)|escape }}|{{ (s ~ s)|escape }}|{{ (s + s)|escape }}

@@ -2785,7 +2785,15 @@ func (s *State) evalBinOp(op *parser.BinOp) (value.Value, error) {
 		}
 		return value.Undefined(), NewError(ErrInvalidOperation, fmt.Sprintf("cannot compare %s and %s", left.Kind(), right.Kind())).WithSpan(op.Span())
 	case parser.BinOpAdd:
-		rv, err := s.addValues(left, right)
+		var rv value.Value
+		var err error
+		// like in Jinja2, adding a plain string to a safe string escapes it
+		// when auto escaping is enabled.
+		if left.Kind() == value.KindString && right.Kind() == value.KindString && s.needsMarkupConcat(left, right) {
+			rv, err = s.markupConcat(left, right)
+		} else {
+			rv, err = s.addValues(left, right)
+		}
 		if err != nil {
 			return value.Undefined(), wrapEvalError(err, op.Span())
 		}
@@ -2827,6 +2835,13 @@ func (s *State) evalBinOp(op *parser.BinOp) (value.Value, error) {
 		}
 		return rv, nil
 	case parser.BinOpConcat:
+		if s.needsMarkupConcat(left, right) {
+			rv, err := s.markupConcat(left, right)
+			if err != nil {
+				return value.Undefined(), wrapEvalError(err, op.Span())
+			}
+			return rv, s.chargeValue(rv)
+		}
 		rv := left.Concat(right)
 		return rv, s.chargeValue(rv)
 	case parser.BinOpIn:
@@ -2838,6 +2853,32 @@ func (s *State) evalBinOp(op *parser.BinOp) (value.Value, error) {
 	default:
 		return value.Undefined(), NewError(ErrInvalidOperation, fmt.Sprintf("unknown binary operator: %v", op.Op)).WithSpan(op.Span())
 	}
+}
+
+// needsMarkupConcat checks if a concatenation has to escape one of the two
+// sides.  This is the case if auto escaping is enabled and exactly one side is
+// a safe string.  This mirrors Jinja2's markup_join.
+func (s *State) needsMarkupConcat(left, right value.Value) bool {
+	return left.IsSafe() != right.IsSafe() && !s.autoEscape.IsNone()
+}
+
+// markupConcat concatenates two values into a safe string.  Safe values are
+// copied unchanged, all other values are escaped for the current auto escape
+// mode with the formatter, like when they are printed.
+func (s *State) markupConcat(left, right value.Value) (value.Value, error) {
+	var b strings.Builder
+	for _, val := range [2]value.Value{left, right} {
+		if val.IsSafe() {
+			b.WriteString(val.String())
+			continue
+		}
+		str, err := s.formatValue(val, true)
+		if err != nil {
+			return value.Undefined(), err
+		}
+		b.WriteString(str)
+	}
+	return value.FromSafeString(b.String()), nil
 }
 
 func (s *State) evalCompare(c *parser.Compare) (value.Value, error) {

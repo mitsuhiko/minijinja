@@ -14,6 +14,10 @@
 ---
 even: {{ two is even }}
 odd: {{ two is odd }}
+even-big: {{ 18446744073709551616 is even }} | {{ 18446744073709551617 is even }}
+odd-big: {{ 18446744073709551617 is odd }} | {{ -18446744073709551617 is odd }} | {{ 18446744073709551616 is odd }}
+even-u128: {{ 340282366920938463463374607431768211454 is even }} | {{ 340282366920938463463374607431768211455 is even }}
+odd-u128: {{ 340282366920938463463374607431768211455 is odd }} | {{ 340282366920938463463374607431768211454 is odd }}
 undefined: {{ two is undefined }}
 defined: {{ two is defined }}
 undefined2: {{ ohwell is undefined }}
@@ -24,6 +28,7 @@ number-int: {{ two is number }}
 number-float: {{ two_dot_two is number }}
 integer-int: {{ 42 is integer }}
 integer-float: {{ 42.0 is integer }}
+integer-big: {{ 18446744073709551616 is integer }} | {{ 340282366920938463463374607431768211455 is integer }}
 float-int: {{ 42 is float }}
 float-float: {{ 42.0 is float }}
 not-seq: {{ two is sequence }}

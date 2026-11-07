@@ -221,17 +221,23 @@ mod builtins {
     ///
     /// Words are started by whitespace or one of `-`, `(`, `{`, `[` and `<`.
     /// Other punctuation such as `'`, `.` or `_` does not start a new word,
-    /// so `don't` becomes `Don't` rather than `Don'T`.
+    /// so `don't` becomes `Don't` rather than `Don'T`.  The first character
+    /// of every word is uppercased, the rest is lowercased.
     ///
     /// ```jinja
     /// <h1>{{ chapter.title|title }}</h1>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn title(v: Cow<'_, str>) -> String {
+        fn is_word_separator(c: char) -> bool {
+            matches!(c, '-' | '(' | '{' | '[' | '<') || c.is_whitespace()
+        }
+
         let mut rv = String::with_capacity(v.len());
         let mut capitalize = true;
-        for c in v.chars() {
-            if matches!(c, '-' | '(' | '{' | '[' | '<') || c.is_whitespace() {
+        let mut chars = v.chars();
+        while let Some(c) = chars.next() {
+            if is_word_separator(c) {
                 rv.push(c);
                 capitalize = true;
             } else if capitalize {
@@ -243,6 +249,19 @@ mod builtins {
                 capitalize = false;
             } else if c.is_ascii() {
                 rv.push(c.to_ascii_lowercase());
+            } else if c == '\u{3a3}' {
+                // Whether a capital sigma lowercases to a final sigma
+                // depends on the rest of the word, so lowercase the rest
+                // of the word at once.
+                let idx = v.len() - chars.as_str().len() - c.len_utf8();
+                let word_start = v[..idx].rfind(is_word_separator).map_or(0, |pos| {
+                    pos + v[pos..].chars().next().map_or(0, char::len_utf8)
+                });
+                let word_end = v[idx..]
+                    .find(is_word_separator)
+                    .map_or(v.len(), |pos| idx + pos);
+                push_lowercase_tail(&mut rv, &v[word_start..word_end], idx - word_start);
+                chars = v[word_end..].chars();
             } else {
                 rv.extend(c.to_lowercase());
             }
@@ -253,19 +272,107 @@ mod builtins {
     /// Convert the string with all its characters lowercased
     /// apart from the first char which is uppercased.
     ///
+    /// Like in Python, the first character is converted to its titlecase
+    /// form, so `ǆ` becomes `ǅ` and `ß` becomes `Ss`.
+    ///
     /// ```jinja
     /// <h1>{{ chapter.title|capitalize }}</h1>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn capitalize(value: StringInput<'_>) -> Value {
-        let mut chars = value.as_str().chars();
-        let output = match chars.next() {
-            None => String::new(),
-            Some(first) => {
-                first.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase()
+        let s = value.as_str();
+        let mut output = String::with_capacity(s.len());
+        if let Some(first) = s.chars().next() {
+            push_titlecase(&mut output, first);
+            push_lowercase_tail(&mut output, s, first.len_utf8());
+        }
+        value.preserve_safety(output)
+    }
+
+    /// Appends `word[start..]` lowercased.
+    ///
+    /// `word[..start]` is still taken into account for the context
+    /// dependent lowercasing of the capital sigma.
+    fn push_lowercase_tail(rv: &mut String, word: &str, start: usize) {
+        let tail = &word[start..];
+        if tail.is_ascii() {
+            let rv_start = rv.len();
+            rv.push_str(tail);
+            rv[rv_start..].make_ascii_lowercase();
+        } else if tail.contains('\u{3a3}') {
+            // A capital sigma lowercases to a final sigma at the end of a
+            // word.  The standard library handles this when lowercasing
+            // whole strings, so lowercase the full word and drop the
+            // prefix.  Apart from the capital sigma all characters are
+            // lowercased on their own, and `Σ` lowercases to `σ` or `ς`
+            // which have the same length, so the length of the lowercased
+            // prefix is known.
+            let lowered = word.to_lowercase();
+            let skip: usize = word[..start]
+                .chars()
+                .flat_map(char::to_lowercase)
+                .map(char::len_utf8)
+                .sum();
+            rv.push_str(&lowered[skip..]);
+        } else {
+            rv.extend(tail.chars().flat_map(char::to_lowercase));
+        }
+    }
+
+    /// Appends the titlecase form of a character.
+    ///
+    /// For most characters this is the same as the uppercase form.  The
+    /// exceptions are taken from the Unicode character database.
+    fn push_titlecase(rv: &mut String, c: char) {
+        if c.is_ascii() {
+            rv.push(c.to_ascii_uppercase());
+            return;
+        }
+        let cp = c as u32;
+        let title = match cp {
+            // the digraphs DŽ, LJ, NJ and DZ have dedicated titlecase forms
+            0x1c4..=0x1cc => cp - (cp - 0x1c4) % 3 + 1,
+            0x1f1..=0x1f3 => 0x1f2,
+            // Georgian Mkhedruli letters are their own titlecase form
+            0x10d0..=0x10fa | 0x10fd..=0x10ff => cp,
+            // Greek letters with ypogegrammeni titlecase to prosgegrammeni
+            0x1f80..=0x1faf => cp | 0x08,
+            0x1fb3 | 0x1fbc => 0x1fbc,
+            0x1fc3 | 0x1fcc => 0x1fcc,
+            0x1ff3 | 0x1ffc => 0x1ffc,
+            _ => {
+                rv.push_str(match c {
+                    '\u{df}' => "Ss",
+                    '\u{587}' => "\u{535}\u{582}",
+                    '\u{1fb2}' => "\u{1fba}\u{345}",
+                    '\u{1fb4}' => "\u{386}\u{345}",
+                    '\u{1fb7}' => "\u{391}\u{342}\u{345}",
+                    '\u{1fc2}' => "\u{1fca}\u{345}",
+                    '\u{1fc4}' => "\u{389}\u{345}",
+                    '\u{1fc7}' => "\u{397}\u{342}\u{345}",
+                    '\u{1ff2}' => "\u{1ffa}\u{345}",
+                    '\u{1ff4}' => "\u{38f}\u{345}",
+                    '\u{1ff7}' => "\u{3a9}\u{342}\u{345}",
+                    '\u{fb00}' => "Ff",
+                    '\u{fb01}' => "Fi",
+                    '\u{fb02}' => "Fl",
+                    '\u{fb03}' => "Ffi",
+                    '\u{fb04}' => "Ffl",
+                    '\u{fb05}' | '\u{fb06}' => "St",
+                    '\u{fb13}' => "\u{544}\u{576}",
+                    '\u{fb14}' => "\u{544}\u{565}",
+                    '\u{fb15}' => "\u{544}\u{56b}",
+                    '\u{fb16}' => "\u{54e}\u{576}",
+                    '\u{fb17}' => "\u{544}\u{56d}",
+                    _ => {
+                        rv.extend(c.to_uppercase());
+                        return;
+                    }
+                });
+                return;
             }
         };
-        value.preserve_safety(output)
+        rv.extend(char::from_u32(title));
     }
 
     /// Does a string replace.
@@ -383,12 +490,17 @@ mod builtins {
     /// Returns the "length" of the value
     ///
     /// By default this filter is also registered under the alias `count`.
+    /// Like in Jinja2, undefined values have a length of `0` unless strict
+    /// undefined behavior is used.
     ///
     /// ```jinja
     /// <p>Search results: {{ results|length }}
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn length(v: &Value) -> Result<usize, Error> {
+        if v.is_undefined() {
+            return Ok(0);
+        }
         v.len().ok_or_else(|| {
             Error::new(
                 ErrorKind::InvalidOperation,
@@ -396,6 +508,11 @@ mod builtins {
             )
             .with_undefined_origin(v)
         })
+    }
+
+    pub(crate) fn length_checked(state: &State, v: &Value) -> Result<usize, Error> {
+        ok!(state.undefined_behavior().assert_iterable(v));
+        length(v)
     }
 
     /// Sorts `(key, payload)` pairs by key.
@@ -521,7 +638,8 @@ mod builtins {
     /// which is typically arbitrary unless the `preserve_order` feature
     /// is used in which case the original order of the map is retained.
     /// It's generally better to use `|dictsort` which sorts the map by
-    /// key before iterating.
+    /// key before iterating.  Like in Jinja2, undefined values give no
+    /// pairs unless strict undefined behavior is used.
     ///
     /// ```jinja
     /// <dl>
@@ -533,7 +651,9 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn items(v: &Value) -> Result<Value, Error> {
-        if v.kind() == ValueKind::Map {
+        if v.is_undefined() {
+            Ok(Value::make_iterable(|| None::<Value>.into_iter()))
+        } else if v.kind() == ValueKind::Map {
             Ok(Value::make_object_iterable(v.clone(), |v| {
                 match v.as_object().and_then(|v| v.try_iter_pairs()) {
                     // invalid keys are passed through rather than wrapped in a pair
@@ -559,7 +679,15 @@ mod builtins {
         }
     }
 
+    pub(crate) fn items_checked(state: &State, v: &Value) -> Result<Value, Error> {
+        ok!(state.undefined_behavior().assert_iterable(v));
+        items(v)
+    }
+
     /// Reverses an iterable or string
+    ///
+    /// Like in Jinja2, `none` cannot be reversed.  Undefined values are
+    /// returned unchanged unless strict undefined behavior is used.
     ///
     /// ```jinja
     /// {% for user in users|reverse %}
@@ -576,7 +704,15 @@ mod builtins {
     }
 
     fn reverse_impl(state: Option<&State>, value: &Value) -> Result<Value, Error> {
-        if value.kind() == ValueKind::String {
+        if let Some(state) = state {
+            ok!(state.undefined_behavior().assert_iterable(value));
+        }
+        if value.is_none() {
+            Err(Error::new(
+                ErrorKind::InvalidOperation,
+                "cannot reverse values of type none",
+            ))
+        } else if value.kind() == ValueKind::String {
             let string = value.as_str().unwrap();
             let output = string.chars().rev().collect::<String>();
             if value.is_safe() {
@@ -697,6 +833,7 @@ mod builtins {
         ok!(kwargs.assert_all_used());
 
         let joiner_str = joiner.as_ref().map(StringInput::as_str).unwrap_or_default();
+        ok!(state.undefined_behavior().assert_iterable(value));
         let iter = ok!(value.try_iter().map_err(|err| {
             Error::new(
                 ErrorKind::InvalidOperation,
@@ -1273,7 +1410,9 @@ mod builtins {
 
     /// Returns the first item from an iterable.
     ///
-    /// If the list is empty `undefined` is returned.
+    /// If the list is empty `undefined` is returned.  Like in Jinja2,
+    /// undefined values are returned unchanged unless strict undefined
+    /// behavior is used.
     ///
     /// ```jinja
     /// <dl>
@@ -1283,7 +1422,9 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn first(value: &Value) -> Result<Value, Error> {
-        if let Some(s) = value.as_str() {
+        if value.is_undefined() {
+            Ok(value.clone())
+        } else if let Some(s) = value.as_str() {
             Ok(s.chars().next().map_or(Value::UNDEFINED, Value::from))
         } else if let Some(iter) = value.as_object().and_then(|x| x.try_iter()) {
             checked(iter)
@@ -1298,10 +1439,16 @@ mod builtins {
         }
     }
 
+    pub(crate) fn first_checked(state: &State, value: &Value) -> Result<Value, Error> {
+        ok!(state.undefined_behavior().assert_iterable(value));
+        first(value)
+    }
+
     /// Returns the last item from an iterable.
     ///
     /// For maps this is the last key.  If the list is empty `undefined` is
-    /// returned.
+    /// returned.  Like in Jinja2, undefined values are returned unchanged
+    /// unless strict undefined behavior is used.
     ///
     /// ```jinja
     /// <h2>Most Recent Update</h2>
@@ -1324,7 +1471,12 @@ mod builtins {
     }
 
     fn last_impl(state: Option<&State>, value: Value) -> Result<Value, Error> {
-        if let Some(string) = value.as_str() {
+        if let Some(state) = state {
+            ok!(state.undefined_behavior().assert_iterable(&value));
+        }
+        if value.is_undefined() {
+            Ok(value)
+        } else if let Some(string) = value.as_str() {
             Ok(string.chars().next_back().map_or(Value::UNDEFINED, |ch| {
                 if value.is_safe() {
                     Value::from_safe_string(ch.to_string())
@@ -1361,8 +1513,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn min(state: &State, value: Value, kwargs: Kwargs) -> Result<Value, Error> {
-        // like `Iterator::min` this returns the first of equal minimums
-        min_max(state, value, kwargs, |ordering| ordering == Ordering::Less)
+        min_max(state, value, kwargs, Ordering::Less)
     }
 
     /// Returns the largest item from an iterable.
@@ -1379,15 +1530,17 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn max(state: &State, value: Value, kwargs: Kwargs) -> Result<Value, Error> {
-        // like `Iterator::max` this returns the last of equal maximums
-        min_max(state, value, kwargs, |ordering| ordering != Ordering::Less)
+        min_max(state, value, kwargs, Ordering::Greater)
     }
 
+    /// Implements `min` and `max`.  An item replaces the current candidate only
+    /// if its key compares strictly as `wanted` so that, like in Jinja2 (and
+    /// Python's `min`/`max`), the first of multiple equal items is returned.
     fn min_max(
         state: &State,
         value: Value,
         kwargs: Kwargs,
-        replaces: fn(Ordering) -> bool,
+        wanted: Ordering,
     ) -> Result<Value, Error> {
         let iter = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
             Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
@@ -1402,7 +1555,7 @@ mod builtins {
                 None => item.clone(),
             };
             if rv.as_ref().map_or(true, |(rv_key, _)| {
-                replaces(cmp_helper(&key, rv_key, case_sensitive, false))
+                cmp_helper(&key, rv_key, case_sensitive, false) == wanted
             }) {
                 rv = Some((key, item));
             }
@@ -2211,6 +2364,9 @@ mod builtins {
             Some(attr) => attr,
             None => ok!(kwargs.get::<&str>("attribute")),
         };
+        if let Some(state) = state {
+            ok!(state.undefined_behavior().assert_iterable(&value));
+        }
         let items: Vec<Value> =
             ok!(checked(State::opt_fuel_iter(state, ok!(value.try_iter()))).try_collect_vec());
         if let Some(state) = state {
@@ -2264,17 +2420,22 @@ mod builtins {
         let mut grouper = None::<Value>;
         let mut list = Vec::new();
 
+        // Like in Jinja2 a group is labelled with the key of its first item
+        // (the sort is stable) when keys compare equal but are not identical
+        // such as `"CA"` and `"ca"` or `1` and `1.0`.
         for (group_by, item) in keyed {
             let group_by = group_by.unwrap_or_default();
-            if let Some(ref last_grouper) = grouper {
-                if cmp_helper(last_grouper, &group_by, case_sensitive, false) != Ordering::Equal {
+            let starts_group = grouper.as_ref().map_or(true, |current| {
+                cmp_helper(current, &group_by, case_sensitive, false) != Ordering::Equal
+            });
+            if starts_group {
+                if let Some(current) = grouper.replace(group_by) {
                     rv.push(Value::from_object(GroupTuple {
-                        grouper: last_grouper.clone(),
+                        grouper: current,
                         list: std::mem::take(&mut list),
                     }));
                 }
             }
-            grouper = Some(group_by);
             list.push(item);
         }
 
