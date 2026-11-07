@@ -560,6 +560,37 @@ func TestNumberFiltersBeyondInt64(t *testing.T) {
 	}
 }
 
+func TestCompareMaps(t *testing.T) {
+	env := NewEnvironment()
+
+	tests := []struct {
+		template string
+		expected string
+	}{
+		{`{{ {"a": 1} < {"a": 2} }}`, "True"},
+		{`{{ {"a": 2} > {"a": 1} }}`, "True"},
+		{`{{ {"a": 1} < {"b": 0} }}`, "True"},
+		{`{{ {"b": 1, "a": 2} < {"a": 2, "c": 0} }}`, "True"},
+		{`{{ {"a": 1} < {"a": 1, "b": 0} }}`, "True"},
+		{`{{ {} < {"a": 1} }}`, "True"},
+		{`{{ {"a": 1} <= {"a": 1} }}`, "True"},
+		{`{{ {"a": none} < {"a": 1} }}`, "True"},
+		{`{{ [{"b": 1}, {"a": 1}]|sort }}`, "[{'a': 1}, {'b': 1}]"},
+	}
+	for _, test := range tests {
+		tmpl, err := env.TemplateFromString(test.template)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", test.template, err)
+		}
+		result, err := tmpl.Render(nil)
+		if err != nil {
+			t.Errorf("render error for %q: %v", test.template, err)
+		} else if result != test.expected {
+			t.Errorf("%q: expected %q, got %q", test.template, test.expected, result)
+		}
+	}
+}
+
 func TestRoundNonFiniteWithNegativePrecision(t *testing.T) {
 	tmpl, err := NewEnvironment().TemplateFromString(
 		"{{ positive|round(-309) }}|{{ negative|round(-309) }}",
