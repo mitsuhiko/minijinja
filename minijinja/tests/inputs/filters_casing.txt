@@ -1,0 +1,8 @@
+{}
+---
+upper: {{ "straße ﬁre ŉ ΐ ᾳ"|upper }}
+lower: {{ "İSTANBUL ΟΔΟΣ ΣΑΣ-ΣΑΣ Σ ΑΣ'Σ"|lower }}
+title-special-casing: {{ "ß ﬁre ŉ ΐ ᾳ ǆemal"|title }}
+title-final-sigma: {{ "ΣΊΣΥΦΟΣ ΟΔΟΣ. ΣΑΣ-ΣΑΣ (ΑΣ) Σ ΑΣ'Σ"|title }}
+capitalize-titlecase: {{ "ß"|capitalize }} {{ "ﬁre"|capitalize }} {{ "ǆemal"|capitalize }} {{ "ᾳ"|capitalize }} {{ "ŉ"|capitalize }}
+capitalize-final-sigma: {{ "ΟΔΟΣ ΟΔΟΣ."|capitalize }} {{ "ΑΣ"|capitalize }} {{ "Σ"|capitalize }}

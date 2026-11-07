@@ -221,17 +221,23 @@ mod builtins {
     ///
     /// Words are started by whitespace or one of `-`, `(`, `{`, `[` and `<`.
     /// Other punctuation such as `'`, `.` or `_` does not start a new word,
-    /// so `don't` becomes `Don't` rather than `Don'T`.
+    /// so `don't` becomes `Don't` rather than `Don'T`.  The first character
+    /// of every word is uppercased, the rest is lowercased.
     ///
     /// ```jinja
     /// <h1>{{ chapter.title|title }}</h1>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn title(v: Cow<'_, str>) -> String {
+        fn is_word_separator(c: char) -> bool {
+            matches!(c, '-' | '(' | '{' | '[' | '<') || c.is_whitespace()
+        }
+
         let mut rv = String::with_capacity(v.len());
         let mut capitalize = true;
-        for c in v.chars() {
-            if matches!(c, '-' | '(' | '{' | '[' | '<') || c.is_whitespace() {
+        let mut chars = v.chars();
+        while let Some(c) = chars.next() {
+            if is_word_separator(c) {
                 rv.push(c);
                 capitalize = true;
             } else if capitalize {
@@ -243,6 +249,19 @@ mod builtins {
                 capitalize = false;
             } else if c.is_ascii() {
                 rv.push(c.to_ascii_lowercase());
+            } else if c == '\u{3a3}' {
+                // Whether a capital sigma lowercases to a final sigma
+                // depends on the rest of the word, so lowercase the rest
+                // of the word at once.
+                let idx = v.len() - chars.as_str().len() - c.len_utf8();
+                let word_start = v[..idx].rfind(is_word_separator).map_or(0, |pos| {
+                    pos + v[pos..].chars().next().map_or(0, char::len_utf8)
+                });
+                let word_end = v[idx..]
+                    .find(is_word_separator)
+                    .map_or(v.len(), |pos| idx + pos);
+                push_lowercase_tail(&mut rv, &v[word_start..word_end], idx - word_start);
+                chars = v[word_end..].chars();
             } else {
                 rv.extend(c.to_lowercase());
             }
@@ -253,19 +272,107 @@ mod builtins {
     /// Convert the string with all its characters lowercased
     /// apart from the first char which is uppercased.
     ///
+    /// Like in Python, the first character is converted to its titlecase
+    /// form, so `ǆ` becomes `ǅ` and `ß` becomes `Ss`.
+    ///
     /// ```jinja
     /// <h1>{{ chapter.title|capitalize }}</h1>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn capitalize(value: StringInput<'_>) -> Value {
-        let mut chars = value.as_str().chars();
-        let output = match chars.next() {
-            None => String::new(),
-            Some(first) => {
-                first.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase()
+        let s = value.as_str();
+        let mut output = String::with_capacity(s.len());
+        if let Some(first) = s.chars().next() {
+            push_titlecase(&mut output, first);
+            push_lowercase_tail(&mut output, s, first.len_utf8());
+        }
+        value.preserve_safety(output)
+    }
+
+    /// Appends `word[start..]` lowercased.
+    ///
+    /// `word[..start]` is still taken into account for the context
+    /// dependent lowercasing of the capital sigma.
+    fn push_lowercase_tail(rv: &mut String, word: &str, start: usize) {
+        let tail = &word[start..];
+        if tail.is_ascii() {
+            let rv_start = rv.len();
+            rv.push_str(tail);
+            rv[rv_start..].make_ascii_lowercase();
+        } else if tail.contains('\u{3a3}') {
+            // A capital sigma lowercases to a final sigma at the end of a
+            // word.  The standard library handles this when lowercasing
+            // whole strings, so lowercase the full word and drop the
+            // prefix.  Apart from the capital sigma all characters are
+            // lowercased on their own, and `Σ` lowercases to `σ` or `ς`
+            // which have the same length, so the length of the lowercased
+            // prefix is known.
+            let lowered = word.to_lowercase();
+            let skip: usize = word[..start]
+                .chars()
+                .flat_map(char::to_lowercase)
+                .map(char::len_utf8)
+                .sum();
+            rv.push_str(&lowered[skip..]);
+        } else {
+            rv.extend(tail.chars().flat_map(char::to_lowercase));
+        }
+    }
+
+    /// Appends the titlecase form of a character.
+    ///
+    /// For most characters this is the same as the uppercase form.  The
+    /// exceptions are taken from the Unicode character database.
+    fn push_titlecase(rv: &mut String, c: char) {
+        if c.is_ascii() {
+            rv.push(c.to_ascii_uppercase());
+            return;
+        }
+        let cp = c as u32;
+        let title = match cp {
+            // the digraphs DŽ, LJ, NJ and DZ have dedicated titlecase forms
+            0x1c4..=0x1cc => cp - (cp - 0x1c4) % 3 + 1,
+            0x1f1..=0x1f3 => 0x1f2,
+            // Georgian Mkhedruli letters are their own titlecase form
+            0x10d0..=0x10fa | 0x10fd..=0x10ff => cp,
+            // Greek letters with ypogegrammeni titlecase to prosgegrammeni
+            0x1f80..=0x1faf => cp | 0x08,
+            0x1fb3 | 0x1fbc => 0x1fbc,
+            0x1fc3 | 0x1fcc => 0x1fcc,
+            0x1ff3 | 0x1ffc => 0x1ffc,
+            _ => {
+                rv.push_str(match c {
+                    '\u{df}' => "Ss",
+                    '\u{587}' => "\u{535}\u{582}",
+                    '\u{1fb2}' => "\u{1fba}\u{345}",
+                    '\u{1fb4}' => "\u{386}\u{345}",
+                    '\u{1fb7}' => "\u{391}\u{342}\u{345}",
+                    '\u{1fc2}' => "\u{1fca}\u{345}",
+                    '\u{1fc4}' => "\u{389}\u{345}",
+                    '\u{1fc7}' => "\u{397}\u{342}\u{345}",
+                    '\u{1ff2}' => "\u{1ffa}\u{345}",
+                    '\u{1ff4}' => "\u{38f}\u{345}",
+                    '\u{1ff7}' => "\u{3a9}\u{342}\u{345}",
+                    '\u{fb00}' => "Ff",
+                    '\u{fb01}' => "Fi",
+                    '\u{fb02}' => "Fl",
+                    '\u{fb03}' => "Ffi",
+                    '\u{fb04}' => "Ffl",
+                    '\u{fb05}' | '\u{fb06}' => "St",
+                    '\u{fb13}' => "\u{544}\u{576}",
+                    '\u{fb14}' => "\u{544}\u{565}",
+                    '\u{fb15}' => "\u{544}\u{56b}",
+                    '\u{fb16}' => "\u{54e}\u{576}",
+                    '\u{fb17}' => "\u{544}\u{56d}",
+                    _ => {
+                        rv.extend(c.to_uppercase());
+                        return;
+                    }
+                });
+                return;
             }
         };
-        value.preserve_safety(output)
+        rv.extend(char::from_u32(title));
     }
 
     /// Does a string replace.

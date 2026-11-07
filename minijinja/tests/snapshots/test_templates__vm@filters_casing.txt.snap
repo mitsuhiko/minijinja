@@ -1,0 +1,12 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "upper: {{ \"straße ﬁre ŉ ΐ ᾳ\"|upper }}\nlower: {{ \"İSTANBUL ΟΔΟΣ ΣΑΣ-ΣΑΣ Σ ΑΣ'Σ\"|lower }}\ntitle-special-casing: {{ \"ß ﬁre ŉ ΐ ᾳ ǆemal\"|title }}\ntitle-final-sigma: {{ \"ΣΊΣΥΦΟΣ ΟΔΟΣ. ΣΑΣ-ΣΑΣ (ΑΣ) Σ ΑΣ'Σ\"|title }}\ncapitalize-titlecase: {{ \"ß\"|capitalize }} {{ \"ﬁre\"|capitalize }} {{ \"ǆemal\"|capitalize }} {{ \"ᾳ\"|capitalize }} {{ \"ŉ\"|capitalize }}\ncapitalize-final-sigma: {{ \"ΟΔΟΣ ΟΔΟΣ.\"|capitalize }} {{ \"ΑΣ\"|capitalize }} {{ \"Σ\"|capitalize }}"
+info: {}
+input_file: minijinja/tests/inputs/filters_casing.txt
+---
+upper: STRASSE FIRE ʼN Ϊ́ ΑΙ
+lower: i̇stanbul οδος σας-σας σ ασ'ς
+title-special-casing: SS FIre ʼN Ϊ́ ΑΙ Ǆemal
+title-final-sigma: Σίσυφος Οδος. Σας-Σας (Ας) Σ Ασ'ς
+capitalize-titlecase: Ss Fire ǅemal ᾼ ʼN
+capitalize-final-sigma: Οδος οδος. Ας Σ
