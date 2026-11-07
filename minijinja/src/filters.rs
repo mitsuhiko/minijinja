@@ -390,8 +390,20 @@ mod builtins {
     /// {{ "aaa"|replace("a", "b", count=1) }}
     ///   -> baa
     /// ```
+    ///
+    /// When called directly from Rust, this function always replaces all
+    /// occurrences.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn replace(
+        state: &mut State,
+        value: StringInput<'_>,
+        from: StringInput<'_>,
+        to: StringInput<'_>,
+    ) -> Result<Value, Error> {
+        replace_impl(state, value, from, to, None)
+    }
+
+    fn replace_impl(
         state: &mut State,
         value: StringInput<'_>,
         from: StringInput<'_>,
@@ -459,7 +471,7 @@ mod builtins {
             None => ok!(kwargs.get::<Option<i64>>("count")),
         };
         ok!(kwargs.assert_all_used());
-        replace(state, value, from, to, count)
+        replace_impl(state, value, from, to, count)
     }
 
     /// Refuses a replacement that would create a string larger than the
