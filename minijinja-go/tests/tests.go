@@ -149,6 +149,9 @@ func TestOdd(_ filters.State, val value.Value, args []value.Value) (bool, error)
 	if i, ok := testInt(val); ok {
 		return i%2 != 0, nil
 	}
+	if odd, ok := bigIntIsOdd(val); ok {
+		return odd, nil
+	}
 	return false, nil
 }
 
@@ -180,6 +183,9 @@ func TestEven(_ filters.State, val value.Value, args []value.Value) (bool, error
 	if i, ok := testInt(val); ok {
 		return i%2 == 0, nil
 	}
+	if odd, ok := bigIntIsOdd(val); ok {
+		return !odd, nil
+	}
 	return false, nil
 }
 
@@ -193,6 +199,21 @@ func testInt(val value.Value) (int64, bool) {
 		return 0, true
 	}
 	return val.AsInt()
+}
+
+// isBigInt reports whether val is an integer outside the 64-bit range.
+func isBigInt(val value.Value) bool {
+	return val.Kind() == value.KindNumber && !val.IsActualInt() && !val.IsActualFloat()
+}
+
+// bigIntIsOdd reports whether an integer outside the 64-bit range is odd,
+// based on the last digit of its decimal form.
+func bigIntIsOdd(val value.Value) (bool, bool) {
+	if !isBigInt(val) {
+		return false, false
+	}
+	s := val.String()
+	return (s[len(s)-1]-'0')%2 == 1, true
 }
 
 // TestDivisibleBy checks if a value is divisible by another number.
@@ -487,6 +508,9 @@ func TestNumber(_ filters.State, val value.Value, _ []value.Value) (bool, error)
 //	{{ 42.0 is integer }}
 //	  -> false
 func TestInteger(_ filters.State, val value.Value, _ []value.Value) (bool, error) {
+	if isBigInt(val) {
+		return true, nil
+	}
 	_, ok := val.AsInt()
 	if !ok {
 		return false, nil

@@ -38,6 +38,7 @@ fn test_python_compatible_collection_rendering() {
     );
 }
 
+#[cfg(feature = "builtins")]
 #[test]
 fn test_tuple_sequence_behavior() {
     let env = Environment::new();

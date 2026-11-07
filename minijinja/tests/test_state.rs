@@ -288,5 +288,9 @@ fn test_known_variables() {
     let state = env.empty_state();
     let mut vars = state.known_variables();
     vars.sort();
+    // the default globals are only registered with the builtins feature
+    #[cfg(feature = "builtins")]
     assert_eq!(vars, vec!["debug", "dict", "foo", "namespace", "range"]);
+    #[cfg(not(feature = "builtins"))]
+    assert_eq!(vars, vec!["foo"]);
 }

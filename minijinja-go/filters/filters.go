@@ -1142,8 +1142,9 @@ func FilterLines(_ State, val value.Value, _ []value.Value, _ map[string]value.V
 // FilterLength returns the number of items in a collection or string.
 //
 // This filter works on sequences, maps, and strings. For strings, it returns
-// the number of characters. This filter is also commonly available under the
-// alias "count".
+// the number of characters. Like in Jinja2, undefined values have a length of
+// 0 unless strict undefined behavior is used. This filter is also commonly
+// available under the alias "count".
 //
 // Example:
 //
@@ -1155,7 +1156,14 @@ func FilterLines(_ State, val value.Value, _ []value.Value, _ map[string]value.V
 //	<p>{{ users|length }} users found</p>
 //	{{ "hello"|length }}
 //	  -> 5
-func FilterLength(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterLength(state State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+	if val.IsUndefined() {
+		// like in Jinja2 undefined has a length of 0
+		if err := assertNotUndefined(state, val); err != nil {
+			return value.Undefined(), err
+		}
+		return value.FromInt(0), nil
+	}
 	if l, ok := val.Len(); ok {
 		return value.FromInt(int64(l)), nil
 	}
@@ -1165,7 +1173,8 @@ func FilterLength(_ State, val value.Value, _ []value.Value, _ map[string]value.
 
 // FilterFirst returns the first item from an iterable.
 //
-// If the iterable is empty, undefined is returned.
+// If the iterable is empty, undefined is returned. Like in Jinja2, undefined
+// values are returned unchanged unless strict undefined behavior is used.
 //
 // Example:
 //
@@ -1178,7 +1187,13 @@ func FilterLength(_ State, val value.Value, _ []value.Value, _ map[string]value.
 //	  <dt>primary email
 //	  <dd>{{ user.email_addresses|first|default('no email') }}
 //	</dl>
-func FilterFirst(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterFirst(state State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+	if val.IsUndefined() {
+		if err := assertNotUndefined(state, val); err != nil {
+			return value.Undefined(), err
+		}
+		return val, nil
+	}
 	// host objects are iterated lazily so that only the first item is
 	// produced.
 	if _, isIterable := val.Raw().(value.Iterable); !isIterable {
@@ -1203,7 +1218,8 @@ func FilterFirst(_ State, val value.Value, _ []value.Value, _ map[string]value.V
 
 // FilterLast returns the last item from an iterable.
 //
-// If the iterable is empty, undefined is returned.
+// If the iterable is empty, undefined is returned. Like in Jinja2, undefined
+// values are returned unchanged unless strict undefined behavior is used.
 //
 // Example:
 //
@@ -1222,6 +1238,12 @@ func FilterFirst(_ State, val value.Value, _ []value.Value, _ map[string]value.V
 //	  </dl>
 //	{% endwith %}
 func FilterLast(state State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+	if val.IsUndefined() {
+		if err := assertNotUndefined(state, val); err != nil {
+			return value.Undefined(), err
+		}
+		return val, nil
+	}
 	if s, ok := val.AsString(); ok {
 		runes := []rune(s)
 		if len(runes) > 0 {
@@ -1262,7 +1284,8 @@ func lastItems(state State, val value.Value) ([]value.Value, error) {
 // FilterReverse reverses an iterable or string.
 //
 // For strings, this reverses the characters. For iterables, it reverses
-// the order of items.
+// the order of items. Like in Jinja2, none cannot be reversed. Undefined
+// values are returned unchanged unless strict undefined behavior is used.
 //
 // Example:
 //
@@ -1277,6 +1300,12 @@ func lastItems(state State, val value.Value) ([]value.Value, error) {
 //	{{ "hello"|reverse }}
 //	  -> "olleh"
 func FilterReverse(state State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+	if val.IsUndefined() {
+		if err := assertNotUndefined(state, val); err != nil {
+			return value.Undefined(), err
+		}
+		return val, nil
+	}
 	if s, ok := val.AsString(); ok {
 		runes := []rune(s)
 		for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
@@ -1312,9 +1341,6 @@ func FilterReverse(state State, val value.Value, _ []value.Value, _ map[string]v
 			result[len(items)-1-i] = item
 		}
 		return value.FromIterator(value.NewIterator("reversed", result)), nil
-	}
-	if val.IsNone() || val.IsUndefined() {
-		return val, nil
 	}
 	return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation,
 		fmt.Sprintf("cannot reverse values of type %s", val.Kind()))
@@ -1503,6 +1529,9 @@ func parseInt(s string) (int64, error) {
 func FilterJoin(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	params, err := filterParams(args, kwargs, "d", "attribute")
 	if err != nil {
+		return value.Undefined(), err
+	}
+	if err := assertNotUndefined(state, val); err != nil {
 		return value.Undefined(), err
 	}
 	if val.IsNone() || val.IsUndefined() {
@@ -2464,6 +2493,9 @@ func FilterRejectAttr(state State, val value.Value, args []value.Value, kwargs m
 //   - default: value to use when attribute is missing
 //   - case_sensitive: if true, sort in a case-sensitive manner (default: false)
 func FilterGroupBy(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	if err := assertNotUndefined(state, val); err != nil {
+		return value.Undefined(), err
+	}
 	items, err := fuelItems(state, val)
 	if err != nil {
 		return value.Undefined(), err
@@ -2522,7 +2554,9 @@ func FilterGroupBy(state State, val value.Value, args []value.Value, kwargs map[
 		return compareGroupBy(sorted[i].key, sorted[j].key, caseSensitive) < 0
 	})
 
-	// Group items
+	// Group items.  Like in Jinja2 a group is labelled with the key of its
+	// first item when keys compare equal without being identical (such as
+	// "CA" and "ca" or 1 and 1.0).
 	var result []value.Value
 	var currentGrouper value.Value
 	var currentList []value.Value
@@ -2530,25 +2564,19 @@ func FilterGroupBy(state State, val value.Value, args []value.Value, kwargs map[
 
 	for _, keyed := range sorted {
 		item, groupValue := keyed.item, keyed.key
-		if !hasGroup {
-			currentGrouper = groupValue
-			currentList = []value.Value{item}
-			hasGroup = true
+		if hasGroup && groupByEqual(currentGrouper, groupValue, caseSensitive) {
+			currentList = append(currentList, item)
 			continue
 		}
-
-		if !groupByEqual(currentGrouper, groupValue, caseSensitive) {
+		if hasGroup {
 			result = append(result, value.FromObject(&groupObject{
 				grouper: currentGrouper,
 				list:    currentList,
 			}))
-			currentGrouper = groupValue
-			currentList = []value.Value{item}
-			continue
 		}
-
 		currentGrouper = groupValue
-		currentList = append(currentList, item)
+		currentList = []value.Value{item}
+		hasGroup = true
 	}
 
 	if hasGroup {
@@ -2573,22 +2601,9 @@ func compareGroupBy(a, b value.Value, caseSensitive bool) int {
 	if !caseSensitive {
 		if s1, ok := a.AsString(); ok {
 			if s2, ok := b.AsString(); ok {
-				lowerCmp := strings.Compare(strings.ToLower(s1), strings.ToLower(s2))
-				if lowerCmp != 0 {
-					return lowerCmp
-				}
-				if s1 != s2 {
-					rank1 := caseRank(s1)
-					rank2 := caseRank(s2)
-					if rank1 != rank2 {
-						if rank1 < rank2 {
-							return -1
-						}
-						return 1
-					}
-					return strings.Compare(s1, s2)
-				}
-				return 0
+				// Strings differing only in case compare equal so that the
+				// stable sort keeps them in their original order.
+				return strings.Compare(strings.ToLower(s1), strings.ToLower(s2))
 			}
 		}
 	}
@@ -2610,13 +2625,6 @@ func groupByEqual(a, b value.Value, caseSensitive bool) bool {
 		return cmp == 0
 	}
 	return a.Repr() == b.Repr()
-}
-
-func caseRank(s string) int {
-	if s == strings.ToLower(s) {
-		return 1
-	}
-	return 0
 }
 
 // groupObject represents a group in groupby filter
@@ -3323,7 +3331,8 @@ func FilterRound(_ State, val value.Value, args []value.Value, kwargs map[string
 //
 // This converts a map into a list of [key, value] tuples. The keys of Go maps
 // are sorted alphabetically, map objects keep their iteration order. Values
-// that are not maps are rejected with an error.
+// that are not maps are rejected with an error. Like in Jinja2, undefined
+// values give no pairs unless strict undefined behavior is used.
 //
 // Example:
 //
@@ -3339,6 +3348,13 @@ func FilterRound(_ State, val value.Value, args []value.Value, kwargs map[string
 //	{% endfor %}
 //	</dl>
 func FilterItems(state State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+	if val.IsUndefined() {
+		// like in Jinja2 undefined has no items
+		if err := assertNotUndefined(state, val); err != nil {
+			return value.Undefined(), err
+		}
+		return value.FromSlice(nil), nil
+	}
 	pairs, ok, err := mapPairs(state, val)
 	if err != nil {
 		return value.Undefined(), err

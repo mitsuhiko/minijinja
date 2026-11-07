@@ -1,9 +1,12 @@
 package value
 
 import (
+	"cmp"
 	"fmt"
+	"maps"
 	"math"
 	"math/big"
+	"slices"
 	"strings"
 )
 
@@ -163,11 +166,15 @@ func intArith(v, other Value, opName string, checked func(a, b int64) (int64, bo
 }
 
 // Add performs addition or string concatenation.
+//
+// Concatenating two strings does not escape anything, so the result is only
+// safe if both strings are safe.  Templates escape the unsafe side of an
+// addition of a safe and an unsafe string when auto escaping is enabled.
 func (v Value) Add(other Value) (Value, error) {
 	// String concatenation
 	if s1, ok := v.AsString(); ok {
 		if s2, ok := other.AsString(); ok {
-			if v.IsSafe() || other.IsSafe() {
+			if v.IsSafe() && other.IsSafe() {
 				return FromSafeString(s1 + s2), nil
 			}
 			return FromString(s1 + s2), nil
@@ -751,11 +758,36 @@ func (v Value) Compare(other Value) (int, bool) {
 	// Object comparison using ObjectWithCmp
 	if obj1, ok := v.AsObject(); ok {
 		if obj2, ok := other.AsObject(); ok {
-			return CompareObjects(obj1, obj2)
+			if cmp, ok := CompareObjects(obj1, obj2); ok {
+				return cmp, true
+			}
+		}
+	}
+
+	// Map comparison.  Like in Rust, the (key, value) pairs are compared in
+	// key order.
+	if m1, ok := v.AsMap(); ok {
+		if m2, ok := other.AsMap(); ok {
+			return compareMaps(m1, m2), true
 		}
 	}
 
 	return 0, false
+}
+
+// compareMaps compares two maps by their (key, value) pairs in key order.
+func compareMaps(m1, m2 map[string]Value) int {
+	keys1 := slices.Sorted(maps.Keys(m1))
+	keys2 := slices.Sorted(maps.Keys(m2))
+	for i := 0; i < len(keys1) && i < len(keys2); i++ {
+		if cmp := strings.Compare(keys1[i], keys2[i]); cmp != 0 {
+			return cmp
+		}
+		if cmp, ok := m1[keys1[i]].Compare(m2[keys2[i]]); ok && cmp != 0 {
+			return cmp
+		}
+	}
+	return cmp.Compare(len(keys1), len(keys2))
 }
 
 // Contains checks if v contains other.
@@ -813,6 +845,10 @@ func isSeqOrIterable(v Value) bool {
 }
 
 // Concat performs the tilde (~) string concatenation.
+//
+// This does not escape anything, so the result is only safe if both values
+// are safe.  Templates escape the unsafe side of a concatenation of a safe and
+// an unsafe value when auto escaping is enabled.
 func (v Value) Concat(other Value) Value {
 	s1 := v.String()
 	s2 := other.String()
