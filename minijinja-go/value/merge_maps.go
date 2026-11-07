@@ -77,3 +77,13 @@ func keysForValue(v Value) []string {
 	}
 	return nil
 }
+
+// String renders the merged map like a map.
+func (m *mergedMap) String() string {
+	keys := m.Keys()
+	merged := newMapWithCapacity(len(keys))
+	for _, key := range keys {
+		merged.Set(FromString(key), m.GetAttr(key))
+	}
+	return formatMap(merged)
+}

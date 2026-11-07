@@ -3,7 +3,9 @@
 package jsonvalue
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"math"
 	"strconv"
 	"strings"
@@ -11,52 +13,131 @@ import (
 	"github.com/mitsuhiko/minijinja/minijinja-go/v3/value"
 )
 
+// ErrUnsupportedKey is returned for map keys that cannot be JSON object
+// keys.  Like serde_json in Rust, strings, numbers and booleans are
+// supported keys.
+var ErrUnsupportedKey = errors.New("cannot serialize to JSON")
+
 // ToNative converts a value into a Go value that encoding/json serializes
-// the same way the Rust implementation (serde_json) does.
-func ToNative(v value.Value) interface{} {
+// the same way the Rust implementation (serde_json) does.  Maps keep their
+// key order.
+func ToNative(v value.Value) (interface{}, error) {
 	switch v.Kind() {
 	case value.KindUndefined, value.KindNone:
-		return nil
+		return nil, nil
 	case value.KindBool:
 		b, _ := v.AsBool()
-		return b
+		return b, nil
 	case value.KindNumber:
 		if i, ok := v.AsInt(); ok && v.IsActualInt() {
-			return i
+			return i, nil
 		}
 		if f, ok := v.AsFloat(); ok {
-			return jsonFloat(f)
+			return jsonFloat(f), nil
 		}
 		// An integer outside the 64-bit range, which serde_json writes
 		// out in full like any other integer
-		return json.Number(v.String())
+		return json.Number(v.String()), nil
 	case value.KindString:
 		s, _ := v.AsString()
-		return s
+		return s, nil
 	case value.KindSeq, value.KindIterable:
 		items := v.Iter()
 		result := make([]interface{}, len(items))
 		for i, item := range items {
-			result[i] = ToNative(item)
-		}
-		return result
-	case value.KindMap:
-		m, _ := v.AsMap()
-		result := make(map[string]interface{})
-		for k, val := range m {
-			result[k] = ToNative(val)
-		}
-		return result
-	default:
-		if m, ok := v.AsMap(); ok {
-			result := make(map[string]interface{})
-			for k, val := range m {
-				result[k] = ToNative(val)
+			native, err := ToNative(item)
+			if err != nil {
+				return nil, err
 			}
-			return result
+			result[i] = native
 		}
-		return v.String()
+		return result, nil
 	}
+	m, ok := v.AsValueMap()
+	if !ok && v.Kind() == value.KindMap {
+		// map objects
+		m = value.NewMap()
+		for _, k := range v.Iter() {
+			m.Set(k, v.GetItem(k))
+		}
+		ok = true
+	}
+	if ok {
+		result := &object{
+			keys:   make([]string, 0, m.Len()),
+			values: make([]interface{}, 0, m.Len()),
+		}
+		for k, val := range m.All() {
+			key, err := objectKey(k)
+			if err != nil {
+				return nil, err
+			}
+			native, err := ToNative(val)
+			if err != nil {
+				return nil, err
+			}
+			result.keys = append(result.keys, key)
+			result.values = append(result.values, native)
+		}
+		return result, nil
+	}
+	return v.String(), nil
+}
+
+// objectKey converts a map key into a JSON object key like serde_json.
+func objectKey(k value.Value) (string, error) {
+	switch k.Kind() {
+	case value.KindString:
+		s, _ := k.AsString()
+		return s, nil
+	case value.KindBool:
+		if b, _ := k.AsBool(); b {
+			return "true", nil
+		}
+		return "false", nil
+	case value.KindNumber:
+		if k.IsActualFloat() {
+			f, _ := k.AsFloat()
+			if math.IsNaN(f) || math.IsInf(f, 0) {
+				return "", ErrUnsupportedKey
+			}
+			b, err := jsonFloat(f).MarshalJSON()
+			return string(b), err
+		}
+		return k.String(), nil
+	}
+	return "", ErrUnsupportedKey
+}
+
+// object is a JSON object that keeps the order of its keys.
+type object struct {
+	keys   []string
+	values []interface{}
+}
+
+func (o *object) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	// HTML characters are escaped (or not) by the encoder that serializes
+	// the whole value.
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	buf.WriteByte('{')
+	for i, key := range o.keys {
+		if i > 0 {
+			buf.WriteByte(',')
+		}
+		if err := enc.Encode(key); err != nil {
+			return nil, err
+		}
+		buf.Truncate(buf.Len() - 1) // strip the newline Encode adds
+		buf.WriteByte(':')
+		if err := enc.Encode(o.values[i]); err != nil {
+			return nil, err
+		}
+		buf.Truncate(buf.Len() - 1)
+	}
+	buf.WriteByte('}')
+	return buf.Bytes(), nil
 }
 
 // jsonFloat serializes floats like the Rust implementation (serde_json): a

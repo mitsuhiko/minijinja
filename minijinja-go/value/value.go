@@ -48,6 +48,16 @@
 //	    fmt.Println("It's a string!")
 //	}
 //
+// # Maps
+//
+// There are two kinds of map values.  Go maps with string keys (FromMap,
+// and FromAny for maps with string keys and structs) iterate in sorted key
+// order.  Maps created by templates ({1: 'a'}, dict(), ...) and FromValueMap
+// are a [Map]: an insertion ordered map with [Value] keys where, like in
+// Python and MiniJinja for Rust, 1, 1.0 and true are the same key, but 1
+// and "1" are not.  Use [Value.AsValueMap] to inspect any map with its
+// original keys; [Value.AsMap] converts the keys to strings.
+//
 //	// Conversion
 //	if s, ok := name.AsString(); ok {
 //	    fmt.Println("String value:", s)
@@ -219,8 +229,10 @@ const (
 
 	// KindMap represents a key-value mapping (dict/object).
 	//
-	// Maps associate string keys with values and can be accessed using
-	// dot notation or bracket notation in templates.
+	// Maps associate keys with values and can be accessed using dot
+	// notation or bracket notation in templates.  Maps created with FromMap
+	// have string keys, maps created by templates (see [Map]) can have keys
+	// of any kind.
 	KindMap
 
 	// KindIterable represents a lazy iterator.
@@ -579,6 +591,10 @@ func FromSlice(v []Value) Value {
 //	// In template: {{ user.name }}  -> Alice
 //	// In template: {{ user["age"] }}  -> 30
 //	// In template: {% for key in user %}{{ key }}{% endfor %}
+//
+// Go maps have no order, so the keys are iterated (and rendered) in sorted
+// order.  To create a map with keys that are not strings or with a specific
+// order, use [FromValueMap].
 func FromMap(v map[string]Value) Value {
 	return Value{data: v}
 }
@@ -643,7 +659,9 @@ func FromObject(o Object) Value {
 //   - string -> FromString()
 //   - []byte -> FromBytes()
 //   - slices/arrays -> FromSlice() (recursively)
-//   - maps -> FromMap() (recursively)
+//   - maps with string keys -> FromMap() (recursively)
+//   - maps with other keys -> FromValueMap() with the keys converted to
+//     values and sorted (recursively)
 //   - structs -> FromMap() (using exported fields and json tags)
 //   - pointers/interfaces -> dereference and convert
 //
@@ -743,19 +761,30 @@ func fromReflectValue(rv reflect.Value) Value {
 		}
 		return FromSlice(slice)
 	case reflect.Map:
-		m := make(map[string]Value)
+		if rv.Type().Key().Kind() == reflect.String {
+			m := make(map[string]Value, rv.Len())
+			iter := rv.MapRange()
+			for iter.Next() {
+				m[iter.Key().String()] = fromReflectValue(iter.Value())
+			}
+			return FromMap(m)
+		}
+		// Maps with other keys keep their keys as values, so that a
+		// map[int]string can be indexed with integers.  Go maps have no
+		// order, so the keys are sorted like MiniJinja for Rust sorts them.
+		unsorted := newMapWithCapacity(rv.Len())
 		iter := rv.MapRange()
 		for iter.Next() {
-			k := iter.Key()
-			var key string
-			if k.Kind() == reflect.String {
-				key = k.String()
-			} else {
-				key = fmt.Sprintf("%v", k.Interface())
-			}
-			m[key] = fromReflectValue(iter.Value())
+			unsorted.Set(fromReflectValue(iter.Key()), fromReflectValue(iter.Value()))
 		}
-		return FromMap(m)
+		keys := unsorted.Keys()
+		sortMapKeys(keys)
+		m := newMapWithCapacity(len(keys))
+		for _, k := range keys {
+			v, _ := unsorted.Get(k)
+			m.Set(k, v)
+		}
+		return FromValueMap(m)
 	case reflect.Struct:
 		return fromStruct(rv)
 	case reflect.Ptr, reflect.Interface:
@@ -809,7 +838,7 @@ func (v Value) Kind() ValueKind {
 		return KindBytes
 	case []Value, tupleValue:
 		return KindSeq
-	case map[string]Value:
+	case map[string]Value, *Map:
 		return KindMap
 	case *Iterator:
 		return KindIterable
@@ -915,6 +944,8 @@ func (v Value) IsTrue() bool {
 		return len(d.items) > 0
 	case map[string]Value:
 		return len(d) > 0
+	case *Map:
+		return d.Len() > 0
 	case Object:
 		return GetObjectTruth(d)
 	default:
@@ -957,16 +988,9 @@ func (v Value) String() string {
 		}
 		return "[" + strings.Join(parts, ", ") + "]"
 	case map[string]Value:
-		var parts []string
-		keys := make([]string, 0, len(d))
-		for k := range d {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, k := range keys {
-			parts = append(parts, fmt.Sprintf("%s: %s", pythonStringRepr(k), d[k].Repr()))
-		}
-		return "{" + strings.Join(parts, ", ") + "}"
+		return formatStringMap(d)
+	case *Map:
+		return formatMap(d)
 	default:
 		return fmt.Sprintf("%v", d)
 	}
@@ -1003,16 +1027,9 @@ func (v Value) Repr() string {
 	case *Iterator:
 		return formatSequence(d.items, false)
 	case map[string]Value:
-		var parts []string
-		keys := make([]string, 0, len(d))
-		for k := range d {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, k := range keys {
-			parts = append(parts, fmt.Sprintf("%s: %s", formatMapKey(k), d[k].Repr()))
-		}
-		return "{" + strings.Join(parts, ", ") + "}"
+		return formatStringMap(d)
+	case *Map:
+		return formatMap(d)
 	default:
 		return fmt.Sprintf("%v", d)
 	}
@@ -1043,13 +1060,27 @@ func formatFloat(f float64, debug bool) string {
 	return s
 }
 
-func formatMapKey(key string) string {
-	if i, err := strconv.ParseInt(key, 10, 64); err == nil {
-		if strconv.FormatInt(i, 10) == key {
-			return key
-		}
+// formatStringMap formats a Go map with sorted keys.
+func formatStringMap(m map[string]Value) string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
 	}
-	return pythonStringRepr(key)
+	sort.Strings(keys)
+	parts := make([]string, len(keys))
+	for i, k := range keys {
+		parts[i] = pythonStringRepr(k) + ": " + m[k].Repr()
+	}
+	return "{" + strings.Join(parts, ", ") + "}"
+}
+
+// formatMap formats a map in insertion order.
+func formatMap(m *Map) string {
+	parts := make([]string, m.Len())
+	for i, k := range m.keys {
+		parts[i] = k.Repr() + ": " + m.values[i].Repr()
+	}
+	return "{" + strings.Join(parts, ", ") + "}"
 }
 
 func formatSequence(items []Value, tuple bool) string {
@@ -1161,6 +1192,11 @@ func (v Value) SameAs(other Value) bool {
 				return reflect.ValueOf(m1).Pointer() == reflect.ValueOf(m2).Pointer()
 			}
 		}
+		if m1, ok1 := v.data.(*Map); ok1 {
+			if m2, ok2 := other.data.(*Map); ok2 {
+				return m1 == m2
+			}
+		}
 		return false
 	}
 
@@ -1239,13 +1275,41 @@ func (v Value) AsSlice() ([]Value, bool) {
 	}
 }
 
-// AsMap returns the map if it is one.
+// AsMap returns the map with string keys if it is one.
+//
+// For maps created with FromMap this is the map itself.  Maps with [Value]
+// keys (such as maps created by templates, see [Map]) are converted into a
+// new Go map: keys that are not strings are converted to their string
+// representation, so {1: 'a'} becomes map[string]Value{"1": "a"}.  As the
+// conversion loses the key types and their order and changes to the
+// returned map are not reflected in the value, prefer [Value.AsValueMap] to
+// inspect arbitrary maps.
 func (v Value) AsMap() (map[string]Value, bool) {
-	if m, ok := v.data.(map[string]Value); ok {
-		return m, true
+	switch d := v.data.(type) {
+	case map[string]Value:
+		return d, true
+	case *Map:
+		return d.stringMap(), true
+	case MapGetter:
+		return d.Map(), true
 	}
-	if m, ok := v.data.(MapGetter); ok {
-		return m.Map(), true
+	return nil, false
+}
+
+// AsValueMap returns the map with [Value] keys if it is one.
+//
+// For maps created by templates or with FromValueMap this is the map itself
+// with its keys in insertion order.  Go maps with string keys (FromMap) and
+// objects that implement [MapGetter] are converted into a new [Map] with
+// sorted keys, so changes to it are not reflected in the value.
+func (v Value) AsValueMap() (*Map, bool) {
+	switch d := v.data.(type) {
+	case *Map:
+		return d, true
+	case map[string]Value:
+		return mapFromStringMap(d), true
+	case MapGetter:
+		return mapFromStringMap(d.Map()), true
 	}
 	return nil, false
 }
@@ -1267,6 +1331,8 @@ func (v Value) Len() (int, bool) {
 		return len(d.items), true
 	case map[string]Value:
 		return len(d), true
+	case *Map:
+		return d.Len(), true
 	case LenGetter:
 		return d.Len()
 	case Object:
@@ -1304,6 +1370,10 @@ func (v Value) GetItem(key Value) Value {
 			if val, exists := d[s]; exists {
 				return val
 			}
+		}
+	case *Map:
+		if val, exists := d.Get(key); exists {
+			return val
 		}
 	case string:
 		if idx, ok := key.AsInt(); ok {
@@ -1385,6 +1455,10 @@ func (v Value) GetAttr(name string) Value {
 		if val, ok := d[name]; ok {
 			return val
 		}
+	case *Map:
+		if val, ok := d.Get(FromString(name)); ok {
+			return val
+		}
 	case Object:
 		return d.GetAttr(name)
 	}
@@ -1449,6 +1523,8 @@ func (v Value) Iter() []Value {
 		for i, k := range keys {
 			items[i] = FromString(k)
 		}
+	case *Map:
+		items = d.Keys()
 	case string:
 		runes := []rune(d)
 		items = make([]Value, len(runes))
@@ -1498,6 +1574,8 @@ func (v Value) Clone() Value {
 			newMap[k] = val
 		}
 		return Value{data: newMap}
+	case *Map:
+		return Value{data: d.Clone()}
 	default:
 		return v // Immutable types can be shared
 	}

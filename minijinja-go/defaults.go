@@ -186,13 +186,13 @@ func fnRange(state *State, args []value.Value, kwargs map[string]value.Value) (v
 }
 
 func fnDict(state *State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	result := make(map[string]value.Value)
+	result := value.NewMap()
 
 	// First, copy from first positional argument if it's a map
 	if len(args) > 0 {
-		if m, ok := args[0].AsMap(); ok {
-			for k, v := range m {
-				result[k] = v
+		if m, ok := args[0].AsValueMap(); ok {
+			for k, v := range m.All() {
+				result.Set(k, v)
 			}
 		} else {
 			// Try to iterate as items
@@ -203,20 +203,24 @@ func fnDict(state *State, args []value.Value, kwargs map[string]value.Value) (va
 			if items != nil {
 				for _, item := range items {
 					if pair, ok := item.AsSlice(); ok && len(pair) == 2 {
-						if k, ok := pair[0].AsString(); ok {
-							result[k] = pair[1]
-						}
+						result.Set(pair[0], pair[1])
 					}
 				}
 			}
 		}
 	}
 
-	// Then apply kwargs (overwriting)
-	for k, v := range kwargs {
-		result[k] = v
+	// Then apply kwargs (overwriting).  Go does not retain the order of
+	// keyword arguments, so they are added in sorted order.
+	keys := make([]string, 0, len(kwargs))
+	for k := range kwargs {
+		keys = append(keys, k)
 	}
-	return value.FromMap(result), nil
+	sort.Strings(keys)
+	for _, k := range keys {
+		result.Set(value.FromString(k), kwargs[k])
+	}
+	return value.FromValueMap(result), nil
 }
 
 func fnCycler(_ *State, args []value.Value, _ map[string]value.Value) (value.Value, error) {

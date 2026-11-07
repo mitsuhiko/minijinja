@@ -1,0 +1,13 @@
+---
+source: minijinja-go
+description: "Keyword arguments are a map[string]Value in Go, so splatting a map with integer keys into them turns the keys into strings (Rust keeps them as integers)."
+---
+[1, 2, 3, 4, 5, 6, 7, 8, 9]
+[1, 2, 3, 4, 5, 6, 7, 8, 9]
+[1, 2, 3, 4, 5, 6, 7, 8, 9]
+[1, 2, 3, 4, 5, 6, 7, 8, 9]
+[1, 2, {'one': 1, 'two': 2}]
+[1, 2, {'one': 1, 'two': 2}]
+[1, 2, {'one': 1, 'two': 2}]
+[1, 2, 3, 4, {'8': 8, '9': 9}]
+[1, 2, 3, 4, {'8': 8, '9': 9}]

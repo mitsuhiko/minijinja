@@ -115,10 +115,21 @@ func stringOrBytesInput(val value.Value) (string, error) {
 	return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, "value is not a string")
 }
 
-// mapPairs returns the key-value pairs of a map value. Plain Go maps are
-// returned with sorted keys, map objects in their iteration order. The second
-// return value is false if the value is not a map.
+// mapPairs returns the key-value pairs of a map value. Maps created by
+// templates are returned in insertion order, plain Go maps with sorted keys
+// and map objects in their iteration order. The second return value is false
+// if the value is not a map.
 func mapPairs(state State, val value.Value) ([][2]value.Value, bool, error) {
+	if m, ok := val.Raw().(*value.Map); ok {
+		if err := chargeItems(state, m.Len()); err != nil {
+			return nil, true, err
+		}
+		pairs := make([][2]value.Value, 0, m.Len())
+		for k, v := range m.All() {
+			pairs = append(pairs, [2]value.Value{k, v})
+		}
+		return pairs, true, nil
+	}
 	if m, ok := val.AsMap(); ok {
 		if err := chargeItems(state, len(m)); err != nil {
 			return nil, true, err
@@ -626,11 +637,11 @@ func formatPrintfWith(formatStr string, args []value.Value, transform func(value
 			if len(args) == 0 {
 				return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("missing an argument for format spec at offset %d", location))
 			}
-			mapping, ok := args[0].AsMap()
+			mapping, ok := args[0].AsValueMap()
 			if !ok {
 				return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, "format argument must be a mapping")
 			}
-			mapped, ok := mapping[key]
+			mapped, ok := mapping.Get(value.FromString(key))
 			if !ok || mapped.IsUndefined() {
 				return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("missing an argument for format spec at offset %d", location))
 			}
@@ -2668,8 +2679,11 @@ func FilterChain(state State, val value.Value, args []value.Value, _ map[string]
 
 	allMaps := true
 	allSeq := true
+	maps := make([]*value.Map, 0, len(allValues))
 	for _, v := range allValues {
-		if _, ok := v.AsMap(); !ok {
+		if m, ok := v.AsValueMap(); ok {
+			maps = append(maps, m)
+		} else {
 			allMaps = false
 		}
 		if _, ok := v.AsSlice(); !ok {
@@ -2678,14 +2692,25 @@ func FilterChain(state State, val value.Value, args []value.Value, _ map[string]
 	}
 
 	if allMaps {
-		merged := make(map[string]value.Value)
-		for _, v := range allValues {
-			m, _ := v.AsMap()
-			for k, val := range m {
-				merged[k] = val
+		// Like in Rust, later maps win and the keys of the merged map are
+		// sorted.
+		union := value.NewMap()
+		for _, m := range maps {
+			for k, v := range m.All() {
+				union.Set(k, v)
 			}
 		}
-		return value.FromMap(merged), nil
+		keys := union.Keys()
+		sort.SliceStable(keys, func(i, j int) bool {
+			cmp, ok := keys[i].Compare(keys[j])
+			return ok && cmp < 0
+		})
+		merged := value.NewMap()
+		for _, k := range keys {
+			v, _ := union.Get(k)
+			merged.Set(k, v)
+		}
+		return value.FromValueMap(merged), nil
 	}
 
 	// Get items from first value.  Unlike in Rust, chains are materialized,
@@ -3570,20 +3595,15 @@ func pprintValue(val value.Value, indent int) string {
 		sb.WriteString("]")
 		return sb.String()
 	case value.KindMap:
-		m, _ := val.AsMap()
-		if len(m) == 0 {
+		m, _ := val.AsValueMap()
+		if m.Len() == 0 {
 			return "{}"
 		}
-		keys := make([]string, 0, len(m))
-		for k := range m {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
 		var sb strings.Builder
 		sb.WriteString("{\n")
-		for _, k := range keys {
+		for k, v := range m.All() {
 			sb.WriteString(strings.Repeat(" ", indent+4))
-			sb.WriteString(fmt.Sprintf("%s: %s,", value.FromString(k).Repr(), pprintValue(m[k], indent+4)))
+			sb.WriteString(fmt.Sprintf("%s: %s,", k.Repr(), pprintValue(v, indent+4)))
 			sb.WriteString("\n")
 		}
 		sb.WriteString(pad)
@@ -3617,7 +3637,10 @@ func pprintValue(val value.Value, indent int) string {
 //   - indent: true for 2-space indent, or integer for custom indent
 func FilterTojson(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	// Convert value to Go native type for JSON serialization
-	native := jsonvalue.ToNative(val)
+	native, err := jsonvalue.ToNative(val)
+	if err != nil {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, err.Error())
+	}
 
 	// Check for indent option
 	indent := ""
@@ -3641,7 +3664,6 @@ func FilterTojson(state State, val value.Value, args []value.Value, kwargs map[s
 	}
 
 	var data []byte
-	var err error
 	if indent != "" {
 		data, err = json.MarshalIndent(native, "", indent)
 	} else {
@@ -3709,19 +3731,13 @@ func urlencodeString(input string) string {
 //	  -> "hello%20world"
 func FilterUrlencode(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	// Check if it's a map (dict) - encode as query string
-	if m, ok := val.AsMap(); ok {
+	if m, ok := val.AsValueMap(); ok {
 		var parts []string
-		keys := make([]string, 0, len(m))
-		for k := range m {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, k := range keys {
-			v := m[k]
+		for k, v := range m.All() {
 			if v.IsNone() {
 				continue
 			}
-			parts = append(parts, urlencodeString(k)+"="+urlencodeString(v.String()))
+			parts = append(parts, urlencodeString(k.String())+"="+urlencodeString(v.String()))
 		}
 		return value.FromString(strings.Join(parts, "&")), nil
 	}

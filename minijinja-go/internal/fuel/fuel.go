@@ -216,6 +216,8 @@ func ValueCost(v value.Value) uint64 {
 		return CostOf(len(d), SlotCost)
 	case map[string]value.Value:
 		return CostOf(len(d), 2*SlotCost)
+	case *value.Map:
+		return CostOf(d.Len(), 2*SlotCost)
 	case *value.Iterator:
 		return CostOf(len(d.Items()), SlotCost)
 	}
@@ -246,7 +248,7 @@ func StringLen(v value.Value) (int, bool) {
 // items from a host object.
 func IsMaterialized(v value.Value) bool {
 	switch v.Raw().(type) {
-	case []value.Value, map[string]value.Value, *value.Iterator, string, []byte:
+	case []value.Value, map[string]value.Value, *value.Map, *value.Iterator, string, []byte:
 		return true
 	case value.Iterable:
 		return true
@@ -276,6 +278,12 @@ func (t *Tracker) Items(v value.Value) ([]value.Value, error) {
 		return items, t.Consume(CostOf(len(items), ItemCost))
 	case map[string]value.Value:
 		if err := t.Ensure(CostOf(len(d), ItemCost)); err != nil {
+			return nil, err
+		}
+		items := v.Iter()
+		return items, t.Consume(CostOf(len(items), ItemCost))
+	case *value.Map:
+		if err := t.Ensure(CostOf(d.Len(), ItemCost)); err != nil {
 			return nil, err
 		}
 		items := v.Iter()

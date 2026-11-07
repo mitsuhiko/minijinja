@@ -3,10 +3,8 @@ package value
 import (
 	"cmp"
 	"fmt"
-	"maps"
 	"math"
 	"math/big"
-	"slices"
 	"strings"
 )
 
@@ -611,13 +609,26 @@ func (v Value) Equal(other Value) bool {
 	}
 
 	// Map comparison
-	if m1, ok := v.AsMap(); ok {
-		if m2, ok := other.AsMap(); ok {
+	if m1, ok := v.data.(map[string]Value); ok {
+		if m2, ok := other.data.(map[string]Value); ok {
 			if len(m1) != len(m2) {
 				return false
 			}
 			for k, val1 := range m1 {
 				if val2, exists := m2[k]; !exists || !val1.Equal(val2) {
+					return false
+				}
+			}
+			return true
+		}
+	}
+	if m1, ok := v.AsValueMap(); ok {
+		if m2, ok := other.AsValueMap(); ok {
+			if m1.Len() != m2.Len() {
+				return false
+			}
+			for k, val1 := range m1.All() {
+				if val2, exists := m2.Get(k); !exists || !val1.Equal(val2) {
 					return false
 				}
 			}
@@ -762,8 +773,8 @@ func (v Value) Compare(other Value) (int, bool) {
 
 	// Map comparison.  Like in Rust, the (key, value) pairs are compared in
 	// key order.
-	if m1, ok := v.AsMap(); ok {
-		if m2, ok := other.AsMap(); ok {
+	if m1, ok := v.AsValueMap(); ok {
+		if m2, ok := other.AsValueMap(); ok {
 			return compareMaps(m1, m2), true
 		}
 	}
@@ -772,14 +783,19 @@ func (v Value) Compare(other Value) (int, bool) {
 }
 
 // compareMaps compares two maps by their (key, value) pairs in key order.
-func compareMaps(m1, m2 map[string]Value) int {
-	keys1 := slices.Sorted(maps.Keys(m1))
-	keys2 := slices.Sorted(maps.Keys(m2))
+// Keys are ordered as values, so {9: 1} < {10: 1}.
+func compareMaps(m1, m2 *Map) int {
+	keys1 := m1.Keys()
+	keys2 := m2.Keys()
+	sortMapKeys(keys1)
+	sortMapKeys(keys2)
 	for i := 0; i < len(keys1) && i < len(keys2); i++ {
-		if cmp := strings.Compare(keys1[i], keys2[i]); cmp != 0 {
+		if cmp, ok := keys1[i].Compare(keys2[i]); ok && cmp != 0 {
 			return cmp
 		}
-		if cmp, ok := m1[keys1[i]].Compare(m2[keys2[i]]); ok && cmp != 0 {
+		val1, _ := m1.Get(keys1[i])
+		val2, _ := m2.Get(keys2[i])
+		if cmp, ok := val1.Compare(val2); ok && cmp != 0 {
 			return cmp
 		}
 	}
@@ -818,6 +834,9 @@ func (v Value) Contains(other Value) bool {
 			_, exists := d[s]
 			return exists
 		}
+	case *Map:
+		_, exists := d.Get(other)
+		return exists
 	case Object:
 		// Like in Rust, map objects are checked for the key while
 		// sequences and iterables are checked for the item.
