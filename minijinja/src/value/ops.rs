@@ -138,6 +138,7 @@ impl WideInt {
         }
     }
 
+    #[cfg(feature = "builtins")]
     pub(crate) fn is_zero(self) -> bool {
         self.mag == 0
     }

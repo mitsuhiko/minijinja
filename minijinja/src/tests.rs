@@ -141,10 +141,13 @@ mod builtins {
     /// Returns whether an integer is odd, or `None` if it is not an integer.
     ///
     /// Integers above the `i128` range are stored as `u128` and are checked
-    /// as such.
+    /// as such.  Like in Jinja2, floats with an integer value count as
+    /// integers, so `1e20 is even` is true.
     fn int_is_odd(v: Value) -> Option<bool> {
         match v.0 {
             crate::value::ValueRepr::U128(x) => Some(x.0 % 2 != 0),
+            // `fract` is NaN for infinity, so it is not an integer
+            crate::value::ValueRepr::F64(x) => (x.fract() == 0.0).then(|| x % 2.0 != 0.0),
             _ => i128::try_from(v).ok().map(|x| x % 2 != 0),
         }
     }

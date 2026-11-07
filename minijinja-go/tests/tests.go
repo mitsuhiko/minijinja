@@ -3,6 +3,7 @@ package tests
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"unicode"
 
@@ -146,13 +147,8 @@ func TestOdd(_ filters.State, val value.Value, args []value.Value) (bool, error)
 	if len(args) > 0 {
 		return false, mjerrors.NewError(mjerrors.ErrInvalidOperation, "odd test expects no arguments")
 	}
-	if i, ok := testInt(val); ok {
-		return i%2 != 0, nil
-	}
-	if odd, ok := bigIntIsOdd(val); ok {
-		return odd, nil
-	}
-	return false, nil
+	odd, ok := intIsOdd(val)
+	return ok && odd, nil
 }
 
 // TestEven checks if a number is even.
@@ -180,25 +176,29 @@ func TestEven(_ filters.State, val value.Value, args []value.Value) (bool, error
 	if len(args) > 0 {
 		return false, mjerrors.NewError(mjerrors.ErrInvalidOperation, "even test expects no arguments")
 	}
-	if i, ok := testInt(val); ok {
-		return i%2 == 0, nil
-	}
-	if odd, ok := bigIntIsOdd(val); ok {
-		return !odd, nil
-	}
-	return false, nil
+	odd, ok := intIsOdd(val)
+	return ok && !odd, nil
 }
 
-// testInt returns the integer value of a number for the odd and even tests.
-// Like in Rust, booleans count as 0 and 1.
-func testInt(val value.Value) (int64, bool) {
+// intIsOdd reports whether a value is an odd integer for the odd and even
+// tests.  The second return value is false if the value is not an integer.
+// Like in Rust, booleans count as 0 and 1, and like in Jinja2 floats with an
+// integer value count as integers, so `1e20 is even` is true.
+func intIsOdd(val value.Value) (bool, bool) {
 	if b, ok := val.AsBool(); ok {
-		if b {
-			return 1, true
-		}
-		return 0, true
+		return b, true
 	}
-	return val.AsInt()
+	if val.IsActualFloat() {
+		f, _ := val.AsFloat()
+		if math.IsInf(f, 0) || f != math.Trunc(f) {
+			return false, false
+		}
+		return math.Mod(f, 2) != 0, true
+	}
+	if i, ok := val.AsInt(); ok {
+		return i%2 != 0, true
+	}
+	return bigIntIsOdd(val)
 }
 
 // isBigInt reports whether val is an integer outside the 64-bit range.
