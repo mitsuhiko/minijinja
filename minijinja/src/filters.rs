@@ -1361,8 +1361,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn min(state: &State, value: Value, kwargs: Kwargs) -> Result<Value, Error> {
-        // like `Iterator::min` this returns the first of equal minimums
-        min_max(state, value, kwargs, |ordering| ordering == Ordering::Less)
+        min_max(state, value, kwargs, Ordering::Less)
     }
 
     /// Returns the largest item from an iterable.
@@ -1379,15 +1378,17 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn max(state: &State, value: Value, kwargs: Kwargs) -> Result<Value, Error> {
-        // like `Iterator::max` this returns the last of equal maximums
-        min_max(state, value, kwargs, |ordering| ordering != Ordering::Less)
+        min_max(state, value, kwargs, Ordering::Greater)
     }
 
+    /// Implements `min` and `max`.  An item replaces the current candidate only
+    /// if its key compares strictly as `wanted` so that, like in Jinja2 (and
+    /// Python's `min`/`max`), the first of multiple equal items is returned.
     fn min_max(
         state: &State,
         value: Value,
         kwargs: Kwargs,
-        replaces: fn(Ordering) -> bool,
+        wanted: Ordering,
     ) -> Result<Value, Error> {
         let iter = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
             Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
@@ -1402,7 +1403,7 @@ mod builtins {
                 None => item.clone(),
             };
             if rv.as_ref().map_or(true, |(rv_key, _)| {
-                replaces(cmp_helper(&key, rv_key, case_sensitive, false))
+                cmp_helper(&key, rv_key, case_sensitive, false) == wanted
             }) {
                 rv = Some((key, item));
             }
@@ -2264,17 +2265,22 @@ mod builtins {
         let mut grouper = None::<Value>;
         let mut list = Vec::new();
 
+        // Like in Jinja2 a group is labelled with the key of its first item
+        // (the sort is stable) when keys compare equal but are not identical
+        // such as `"CA"` and `"ca"` or `1` and `1.0`.
         for (group_by, item) in keyed {
             let group_by = group_by.unwrap_or_default();
-            if let Some(ref last_grouper) = grouper {
-                if cmp_helper(last_grouper, &group_by, case_sensitive, false) != Ordering::Equal {
+            let starts_group = grouper.as_ref().map_or(true, |current| {
+                cmp_helper(current, &group_by, case_sensitive, false) != Ordering::Equal
+            });
+            if starts_group {
+                if let Some(current) = grouper.replace(group_by) {
                     rv.push(Value::from_object(GroupTuple {
-                        grouper: last_grouper.clone(),
+                        grouper: current,
                         list: std::mem::take(&mut list),
                     }));
                 }
             }
-            grouper = Some(group_by);
             list.push(item);
         }
 

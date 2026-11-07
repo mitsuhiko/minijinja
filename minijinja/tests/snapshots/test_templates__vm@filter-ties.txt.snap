@@ -1,0 +1,35 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "max-bool-int: {{ [true, 1]|max }}\nmax-int-float: {{ [1, 1.0]|max }}\nmax-case-insensitive: {{ [\"a\", \"A\"]|max }}\nmax-case-sensitive: {{ [\"a\", \"A\"]|max(case_sensitive=true) }}\nmax-attribute: {{ [{\"k\": 1, \"n\": \"x\"}, {\"k\": 1, \"n\": \"y\"}]|max(attribute=\"k\") }}\nmax-attribute-case-insensitive: {{ [{\"k\": \"a\", \"n\": \"x\"}, {\"k\": \"A\", \"n\": \"y\"}]|max(attribute=\"k\") }}\nmin-bool-int: {{ [true, 1]|min }}\nmin-int-float: {{ [1, 1.0]|min }}\nmin-case-insensitive: {{ [\"a\", \"A\"]|min }}\nmin-attribute: {{ [{\"k\": 1, \"n\": \"x\"}, {\"k\": 1, \"n\": \"y\"}]|min(attribute=\"k\") }}\ngroupby-bool-int: {% for g, l in [{\"a\": true}, {\"a\": 1}]|groupby(\"a\") %}{{ g }}: {{ l }}; {% endfor %}\ngroupby-int-float: {% for g, l in [{\"a\": 1}, {\"a\": 1.0}]|groupby(\"a\") %}{{ g }}: {{ l }}; {% endfor %}\ngroupby-case-insensitive: {% for g, l in items|groupby(\"key\") %}{{ g }}: {{ l|map(attribute=\"id\")|list }}; {% endfor %}\ngroupby-case-sensitive: {% for g, l in items|groupby(\"key\", case_sensitive=true) %}{{ g }}: {{ l|map(attribute=\"id\")|list }}; {% endfor %}\nunique-bool-int: {{ [true, 1]|unique|list }}\nunique-int-float: {{ [1, 1.0, true]|unique|list }}\nunique-case-insensitive: {{ [\"a\", \"A\"]|unique|list }}\nunique-attribute: {{ items|unique(attribute=\"key\")|map(attribute=\"id\")|list }}"
+info:
+  items:
+    - key: b
+      id: 1
+    - key: x
+      id: 2
+    - key: B
+      id: 3
+    - key: X
+      id: 4
+    - key: x
+      id: 5
+input_file: minijinja/tests/inputs/filter-ties.txt
+---
+max-bool-int: True
+max-int-float: 1
+max-case-insensitive: a
+max-case-sensitive: a
+max-attribute: {'k': 1, 'n': 'x'}
+max-attribute-case-insensitive: {'k': 'a', 'n': 'x'}
+min-bool-int: True
+min-int-float: 1
+min-case-insensitive: a
+min-attribute: {'k': 1, 'n': 'x'}
+groupby-bool-int: True: [{'a': True}, {'a': 1}]; 
+groupby-int-float: 1: [{'a': 1}, {'a': 1.0}]; 
+groupby-case-insensitive: b: [1, 3]; x: [2, 4, 5]; 
+groupby-case-sensitive: B: [3]; X: [4]; b: [1]; x: [2, 5]; 
+unique-bool-int: [True]
+unique-int-float: [1]
+unique-case-insensitive: ['a']
+unique-attribute: [1, 2]

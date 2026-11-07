@@ -138,10 +138,6 @@ impl WideInt {
         }
     }
 
-    pub(crate) fn is_odd(self) -> bool {
-        self.mag % 2 == 1
-    }
-
     pub(crate) fn is_zero(self) -> bool {
         self.mag == 0
     }
