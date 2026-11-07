@@ -2,7 +2,14 @@
 
 All notable changes to MiniJinja are documented here.
 
-## Unreleased
+## 3.1.0
+
+This release adds output spans and memory limits through fuel, and fixes many
+differences to Jinja2 in both Rust and Go.  Fuel now also accounts for memory and
+work done in filters and operators, so templates consume more fuel than before and
+fuel budgets might need adjusting.  In Go, maps created by templates now keep the
+type of their keys and their insertion order; `Value.Raw` returns a `*value.Map`
+for them and `Value.AsMap` returns a copy with keys converted to strings.
 
 * Fuel now also limits memory and the work done inside filters and operators, not just the number of instructions.  Templates consume somewhat more fuel than before, so budgets might need adjusting.  #483
 * Added `State::consume_fuel` in Rust and `State.ConsumeFuel` in Go so that custom filters and functions can charge fuel.  #483

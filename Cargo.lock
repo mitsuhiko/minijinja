@@ -2100,7 +2100,7 @@ dependencies = [
 
 [[package]]
 name = "minijinja"
-version = "3.0.5"
+version = "3.1.0"
 dependencies = [
  "indexmap",
  "insta",
@@ -2118,14 +2118,14 @@ dependencies = [
 
 [[package]]
 name = "minijinja-cabi"
-version = "3.0.5"
+version = "3.1.0"
 dependencies = [
  "minijinja",
 ]
 
 [[package]]
 name = "minijinja-cli"
-version = "3.0.5"
+version = "3.1.0"
 dependencies = [
  "anyhow",
  "argument",
@@ -2151,7 +2151,7 @@ dependencies = [
 
 [[package]]
 name = "minijinja-contrib"
-version = "3.0.5"
+version = "3.1.0"
 dependencies = [
  "chrono",
  "insta",
@@ -2164,11 +2164,11 @@ dependencies = [
 
 [[package]]
 name = "minijinja-embed"
-version = "3.0.5"
+version = "3.1.0"
 
 [[package]]
 name = "minijinja-js"
-version = "3.0.5"
+version = "3.1.0"
 dependencies = [
  "console_error_panic_hook",
  "js-sys",
@@ -2179,7 +2179,7 @@ dependencies = [
 
 [[package]]
 name = "minijinja-py"
-version = "3.0.5"
+version = "3.1.0"
 dependencies = [
  "minijinja",
  "minijinja-contrib",
