@@ -56,6 +56,8 @@ string-length: {{ word|length }}
 string-count: {{ word|count }}
 reverse-list: {{ list|reverse }}
 reverse-string: {{ word|reverse }}
+reverse-map: {{ map|reverse|list }}
+reverse-map-twice: {% set r = map|reverse %}{{ r|list }}{{ r|list }}
 trim: |{{ word_with_spaces|trim }}|
 trim-bird: {{ word|trim("Bd") }}
 join-default: {{ list|join }}
@@ -72,6 +74,7 @@ first-word: {{ word|first }}
 first-undefined: {{ []|first is undefined }}
 last-list: {{ list|last }}
 last-word: {{ word|last }}
+last-map: {{ {"a": 1, "b": 2}|last }}
 last-undefined: {{ []|first is undefined }}
 min: {{ other_list|min }}
 max: {{ other_list|max }}

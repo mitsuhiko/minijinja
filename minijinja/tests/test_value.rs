@@ -973,6 +973,14 @@ fn test_reverse() {
     assert_snapshot!(Value::make_iterable(|| 0..3).reverse().unwrap(), @"[2, 1, 0]");
     // strings
     assert_snapshot!(Value::from("abc").reverse().unwrap(), @"cba");
+    // maps and reversible collections
+    let map = BTreeMap::from([("a", 1), ("b", 2)]);
+    assert_snapshot!(Value::from(map).reverse().unwrap(), @"['b', 'a']");
+    #[cfg(feature = "std_collections")]
+    {
+        assert_snapshot!(Value::from_object(BTreeSet::from([1, 2, 3])).reverse().unwrap(), @"[3, 2, 1]");
+        assert_snapshot!(Value::from_object(LinkedList::from([1, 2, 3])).reverse().unwrap(), @"[3, 2, 1]");
+    }
     #[cfg(feature = "serde")]
     {
         use minijinja::value::Serde;
@@ -1020,7 +1028,7 @@ fn test_reverse() {
     assert_eq!(rev_thing.len(), Some(3));
     assert_snapshot!(
         render!("{% set r = m|reverse %}{{ m }}|{{ r }}|{{ r }}", m => rev_thing),
-        @"[0, 1, 2]|[0, 1, 2]|[0, 1, 2]"
+        @"[0, 1, 2]|[2, 1, 0]|[2, 1, 0]"
     );
 
     #[derive(Debug)]

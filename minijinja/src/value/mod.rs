@@ -1662,6 +1662,7 @@ impl Value {
     /// * string and bytes: returns a reversed version of that value
     /// * iterables: returns a reversed version of the iterable.  If the iterable is not
     ///   reversible itself, it consumes it and then reverses it.
+    /// * maps: returns the keys in reverse order.
     pub fn reverse(&self) -> Result<Value, Error> {
         self.reverse_with_fuel(None)
     }
@@ -1720,7 +1721,7 @@ impl Value {
                     let iter = Mutex::new(Some(rev_iter));
                     Some(Value::make_iterable(move || {
                         if let Some(iter) = iter.lock().unwrap().take() {
-                            Box::new(iter) as Box<dyn Iterator<Item = Value> + Send + Sync>
+                            Box::new(iter.rev()) as Box<dyn Iterator<Item = Value> + Send + Sync>
                         } else {
                             match for_restart.reverse().and_then(|x| x.try_iter()) {
                                 Ok(iterable) => Box::new(iterable)
@@ -1738,10 +1739,10 @@ impl Value {
                     Some(Value::make_iterable(move || {
                         if let Some(iter) = iter.lock().unwrap().take() {
                             if let ObjectRepr::Map = repr {
-                                Box::new(iter.map(|(k, _)| k))
+                                Box::new(iter.rev().map(|(k, _)| k))
                                     as Box<dyn Iterator<Item = Value> + Send + Sync>
                             } else {
-                                Box::new(iter.map(Value::from))
+                                Box::new(iter.rev().map(Value::from))
                                     as Box<dyn Iterator<Item = Value> + Send + Sync>
                             }
                         } else {
