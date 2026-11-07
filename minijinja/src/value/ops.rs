@@ -56,13 +56,19 @@ pub(crate) fn as_f64(value: &Value, lossy: bool) -> Option<f64> {
     })
 }
 
+/// Coerces two values to a common type.
+///
+/// Integers are coerced to `i128`.  Integers above `i128::MAX` do not fit,
+/// for those `None` is returned and the caller has to fall back to
+/// [`WideInt`] if it wants exact integer math.
 pub fn coerce<'x>(a: &'x Value, b: &'x Value, lossy: bool) -> Option<CoerceResult<'x>> {
     match (&a.0, &b.0) {
         // equal mappings are trivial
         (ValueRepr::U64(a), ValueRepr::U64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
-        (ValueRepr::U128(a), ValueRepr::U128(b)) => {
-            Some(CoerceResult::I128(a.0 as i128, b.0 as i128))
-        }
+        (ValueRepr::U128(a), ValueRepr::U128(b)) => Some(CoerceResult::I128(
+            some!(i128::try_from(a.0).ok()),
+            some!(i128::try_from(b.0).ok()),
+        )),
         (ValueRepr::String(a, _), ValueRepr::String(b, _)) => Some(CoerceResult::Str(a, b)),
         (ValueRepr::SmallStr(a), ValueRepr::SmallStr(b)) => {
             Some(CoerceResult::Str(a.as_str(), b.as_str()))
@@ -82,6 +88,143 @@ pub fn coerce<'x>(a: &'x Value, b: &'x Value, lossy: bool) -> Option<CoerceResul
             some!(i128::try_from(a.clone()).ok()),
             some!(i128::try_from(b.clone()).ok()),
         )),
+    }
+}
+
+/// An exact integer in the range of integers a value can hold
+/// (`i128::MIN..=u128::MAX`), stored as sign and magnitude.
+///
+/// Integer math is done with `i128` and only falls back to this if an
+/// operand or the result does not fit an `i128`.  This keeps results exact
+/// as long as they can be represented, like Python's arbitrary precision
+/// integers.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct WideInt {
+    neg: bool,
+    mag: u128,
+}
+
+impl WideInt {
+    fn new(neg: bool, mag: u128) -> WideInt {
+        // there is no negative zero
+        WideInt {
+            neg: neg && mag != 0,
+            mag,
+        }
+    }
+
+    /// Returns the integer (or boolean) value as wide integer.
+    pub(crate) fn from_value(value: &Value) -> Option<WideInt> {
+        Some(match value.0 {
+            ValueRepr::Bool(x) => WideInt::new(false, x as u128),
+            ValueRepr::U64(x) => WideInt::new(false, x as u128),
+            ValueRepr::U128(x) => WideInt::new(false, x.0),
+            ValueRepr::I64(x) => WideInt::new(x < 0, x.unsigned_abs() as u128),
+            ValueRepr::I128(x) => WideInt::new(x.0 < 0, x.0.unsigned_abs()),
+            _ => return None,
+        })
+    }
+
+    /// Converts the integer into a value if it can be represented.
+    pub(crate) fn into_value(self) -> Option<Value> {
+        if self.neg {
+            // `wrapping_neg` maps 2**127 to `i128::MIN`.
+            (self.mag <= MIN_I128_AS_POS_U128)
+                .then(|| int_as_value((self.mag as i128).wrapping_neg()))
+        } else if let Ok(val) = i128::try_from(self.mag) {
+            Some(int_as_value(val))
+        } else {
+            Some(Value::from(self.mag))
+        }
+    }
+
+    pub(crate) fn is_odd(self) -> bool {
+        self.mag % 2 == 1
+    }
+
+    pub(crate) fn is_zero(self) -> bool {
+        self.mag == 0
+    }
+
+    fn neg(self) -> WideInt {
+        WideInt::new(!self.neg, self.mag)
+    }
+
+    fn checked_add(self, other: WideInt) -> Option<WideInt> {
+        Some(if self.neg == other.neg {
+            WideInt::new(self.neg, some!(self.mag.checked_add(other.mag)))
+        } else if self.mag >= other.mag {
+            WideInt::new(self.neg, self.mag - other.mag)
+        } else {
+            WideInt::new(other.neg, other.mag - self.mag)
+        })
+    }
+
+    fn checked_sub(self, other: WideInt) -> Option<WideInt> {
+        self.checked_add(other.neg())
+    }
+
+    fn checked_mul(self, other: WideInt) -> Option<WideInt> {
+        Some(WideInt::new(
+            self.neg != other.neg,
+            some!(self.mag.checked_mul(other.mag)),
+        ))
+    }
+
+    /// Floor division and the matching remainder, like in Python.
+    pub(crate) fn div_rem_floor(self, other: WideInt) -> Option<(WideInt, WideInt)> {
+        let mut quotient = some!(self.mag.checked_div(other.mag));
+        let mut remainder = self.mag % other.mag;
+        if remainder != 0 && self.neg != other.neg {
+            // the divisor is at least 2 here, so this cannot overflow
+            quotient += 1;
+            remainder = other.mag - remainder;
+        }
+        // the remainder has the sign of the divisor
+        Some((
+            WideInt::new(self.neg != other.neg, quotient),
+            WideInt::new(other.neg, remainder),
+        ))
+    }
+
+    fn div_floor(self, other: WideInt) -> Option<WideInt> {
+        self.div_rem_floor(other).map(|x| x.0)
+    }
+
+    fn rem_floor(self, other: WideInt) -> Option<WideInt> {
+        self.div_rem_floor(other).map(|x| x.1)
+    }
+
+    fn checked_pow(self, exp: WideInt) -> Option<WideInt> {
+        if exp.neg {
+            return None;
+        }
+        let exp = some!(u32::try_from(exp.mag).ok());
+        Some(WideInt::new(
+            self.neg && exp % 2 == 1,
+            some!(self.mag.checked_pow(exp)),
+        ))
+    }
+}
+
+/// Performs exact integer math with [`WideInt`]s.
+///
+/// This is the slow path for integer operands or results that do not fit an
+/// `i128`.  It fails if the result cannot be represented and if the operands
+/// are not integers.
+#[cold]
+#[inline(never)]
+fn wide_int_op(
+    op: &str,
+    lhs: &Value,
+    rhs: &Value,
+    f: fn(WideInt, WideInt) -> Option<WideInt>,
+) -> Result<Value, Error> {
+    match (WideInt::from_value(lhs), WideInt::from_value(rhs)) {
+        (Some(a), Some(b)) => f(a, b)
+            .and_then(WideInt::into_value)
+            .ok_or_else(|| failed_op(op, lhs, rhs)),
+        _ => Err(impossible_op(op, lhs, rhs)),
     }
 }
 
@@ -337,10 +480,10 @@ macro_rules! math_binop {
             match coerce(lhs, rhs, true) {
                 Some(CoerceResult::I128(a, b)) => match a.$int(b) {
                     Some(val) => Ok(int_as_value(val)),
-                    None => Err(failed_op(stringify!($float), lhs, rhs))
+                    None => wide_int_op(stringify!($float), lhs, rhs, WideInt::$int),
                 },
                 Some(CoerceResult::F64(a, b)) => Ok((a $float b).into()),
-                _ => Err(impossible_op(stringify!($float), lhs, rhs))
+                _ => wide_int_op(stringify!($float), lhs, rhs, WideInt::$int),
             }
         }
     }
@@ -399,18 +542,20 @@ pub fn add(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
         return Ok(Value::from_object(MergeSeq::new_iterable(values)));
     }
     match coerce(lhs, rhs, true) {
-        Some(CoerceResult::I128(a, b)) => a
-            .checked_add(b)
-            .ok_or_else(|| failed_op("+", lhs, rhs))
-            .map(int_as_value),
+        Some(CoerceResult::I128(a, b)) => match a.checked_add(b) {
+            Some(val) => Ok(int_as_value(val)),
+            None => wide_int_op("+", lhs, rhs, WideInt::checked_add),
+        },
         Some(CoerceResult::F64(a, b)) => Ok((a + b).into()),
         Some(CoerceResult::Str(a, b)) => Ok(Value::from([a, b].concat())),
-        _ => Err(impossible_op("+", lhs, rhs)),
+        None => wide_int_op("+", lhs, rhs, WideInt::checked_add),
     }
 }
 
 math_binop!(sub, checked_sub, -);
 
+/// Floor division and the matching remainder.  Fails on division by zero and
+/// for `i128::MIN // -1`, which needs [`WideInt`].
 fn int_div_rem_floor(a: i128, b: i128) -> Option<(i128, i128)> {
     let mut quotient = a.checked_div(b)?;
     let mut remainder = a.checked_rem(b)?;
@@ -446,18 +591,14 @@ fn float_div_rem_floor(a: f64, b: f64) -> (f64, f64) {
 
 pub fn rem(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     match coerce(lhs, rhs, true) {
-        Some(CoerceResult::I128(a, b)) if b != 0 => {
-            if a == i128::MIN && b == -1 {
-                Ok(Value::from(0))
-            } else {
-                int_div_rem_floor(a, b)
-                    .map(|(_, remainder)| int_as_value(remainder))
-                    .ok_or_else(|| failed_op("%", lhs, rhs))
-            }
-        }
+        Some(CoerceResult::I128(a, b)) => match int_div_rem_floor(a, b) {
+            Some((_, remainder)) => Ok(int_as_value(remainder)),
+            None => wide_int_op("%", lhs, rhs, WideInt::rem_floor),
+        },
         Some(CoerceResult::F64(a, b)) if b != 0.0 => Ok(Value::from(float_div_rem_floor(a, b).1)),
-        Some(CoerceResult::I128(..) | CoerceResult::F64(..)) => Err(failed_op("%", lhs, rhs)),
-        _ => Err(impossible_op("%", lhs, rhs)),
+        Some(CoerceResult::F64(..)) => Err(failed_op("%", lhs, rhs)),
+        Some(CoerceResult::Str(..)) => Err(impossible_op("%", lhs, rhs)),
+        None => wide_int_op("%", lhs, rhs, WideInt::rem_floor),
     }
 }
 
@@ -497,10 +638,11 @@ pub fn mul(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     match coerce(lhs, rhs, true) {
         Some(CoerceResult::I128(a, b)) => match a.checked_mul(b) {
             Some(val) => Ok(int_as_value(val)),
-            None => Err(failed_op(stringify!(*), lhs, rhs)),
+            None => wide_int_op("*", lhs, rhs, WideInt::checked_mul),
         },
         Some(CoerceResult::F64(a, b)) => Ok((a * b).into()),
-        _ => Err(impossible_op(stringify!(*), lhs, rhs)),
+        Some(CoerceResult::Str(..)) => Err(impossible_op("*", lhs, rhs)),
+        None => wide_int_op("*", lhs, rhs, WideInt::checked_mul),
     }
 }
 
@@ -588,18 +730,14 @@ pub fn div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
 
 pub fn int_div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     match coerce(lhs, rhs, true) {
-        Some(CoerceResult::I128(a, b)) if b != 0 => {
-            if a == i128::MIN && b == -1 {
-                Ok(Value::from(MIN_I128_AS_POS_U128))
-            } else {
-                int_div_rem_floor(a, b)
-                    .map(|(quotient, _)| int_as_value(quotient))
-                    .ok_or_else(|| failed_op("//", lhs, rhs))
-            }
-        }
+        Some(CoerceResult::I128(a, b)) => match int_div_rem_floor(a, b) {
+            Some((quotient, _)) => Ok(int_as_value(quotient)),
+            None => wide_int_op("//", lhs, rhs, WideInt::div_floor),
+        },
         Some(CoerceResult::F64(a, b)) if b != 0.0 => Ok(Value::from(float_div_rem_floor(a, b).0)),
-        Some(CoerceResult::I128(..) | CoerceResult::F64(..)) => Err(failed_op("//", lhs, rhs)),
-        _ => Err(impossible_op("//", lhs, rhs)),
+        Some(CoerceResult::F64(..)) => Err(failed_op("//", lhs, rhs)),
+        Some(CoerceResult::Str(..)) => Err(impossible_op("//", lhs, rhs)),
+        None => wide_int_op("//", lhs, rhs, WideInt::div_floor),
     }
 }
 
@@ -618,12 +756,22 @@ pub fn pow(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
         Some(CoerceResult::I128(a, b)) => {
             match TryFrom::try_from(b).ok().and_then(|b| a.checked_pow(b)) {
                 Some(val) => Ok(int_as_value(val)),
-                None => Err(failed_op("**", lhs, rhs)),
+                None => wide_int_op("**", lhs, rhs, WideInt::checked_pow),
             }
         }
         Some(CoerceResult::F64(a, b)) if a == 0.0 && b < 0.0 => Err(failed_op("**", lhs, rhs)),
         Some(CoerceResult::F64(a, b)) => Ok((a.powf(b)).into()),
-        _ => Err(impossible_op("**", lhs, rhs)),
+        Some(CoerceResult::Str(..)) => Err(impossible_op("**", lhs, rhs)),
+        None => {
+            // Only a base above `i128::MAX` ends up here, so it is not zero.
+            if WideInt::from_value(lhs).is_some() && WideInt::from_value(rhs).is_some_and(|b| b.neg)
+            {
+                if let (Some(a), Some(b)) = (as_f64(lhs, true), as_f64(rhs, true)) {
+                    return Ok(a.powf(b).into());
+                }
+            }
+            wide_int_op("**", lhs, rhs, WideInt::checked_pow)
+        }
     }
 }
 
@@ -632,20 +780,17 @@ pub fn neg(val: &Value) -> Result<Value, Error> {
     if val.kind() == ValueKind::Number {
         match val.0 {
             ValueRepr::F64(x) => Ok((-x).into()),
-            // special case for the largest i128 that can still be
-            // represented.
-            ValueRepr::U128(x) if x.0 == MIN_I128_AS_POS_U128 => {
-                Ok(Value::from(MIN_I128_AS_POS_U128))
-            }
-            _ => {
-                if let Ok(x) = i128::try_from(val.clone()) {
-                    x.checked_mul(-1)
-                        .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "overflow"))
-                        .map(int_as_value)
-                } else {
-                    Err(Error::from(ErrorKind::InvalidOperation))
-                }
-            }
+            ValueRepr::I64(x) if x != i64::MIN => Ok((-x).into()),
+            // The integers range from -2**127 to 2**128 - 1, so this works
+            // in both directions for 2**127 but fails above it.
+            _ => WideInt::from_value(val)
+                .and_then(|x| x.neg().into_value())
+                .ok_or_else(|| {
+                    Error::new(
+                        ErrorKind::InvalidOperation,
+                        format!("unable to calculate -{val}"),
+                    )
+                }),
         }
     } else {
         Err(Error::from(ErrorKind::InvalidOperation).with_undefined_origin(val))
@@ -850,8 +995,96 @@ mod tests {
 
     #[test]
     fn test_neg() {
-        let err = neg(&Value::from(i128::MIN)).unwrap_err();
-        assert_eq!(err.to_string(), "invalid operation: overflow");
+        assert_eq!(
+            neg(&Value::from(i64::MIN)).unwrap(),
+            Value::from(1u64 << 63)
+        );
+        assert_eq!(
+            neg(&Value::from(i128::MIN)).unwrap(),
+            Value::from(MIN_I128_AS_POS_U128)
+        );
+        assert_eq!(
+            neg(&Value::from(MIN_I128_AS_POS_U128)).unwrap(),
+            Value::from(i128::MIN)
+        );
+        assert_eq!(
+            neg(&Value::from(MIN_I128_AS_POS_U128)).unwrap().to_string(),
+            "-170141183460469231731687303715884105728"
+        );
+        let err = neg(&Value::from(MIN_I128_AS_POS_U128 + 1)).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "invalid operation: unable to calculate -170141183460469231731687303715884105729"
+        );
+    }
+
+    #[test]
+    fn test_wide_int_math() {
+        let max = Value::from(u128::MAX);
+        let min = Value::from(i128::MIN);
+        let big = Value::from(MIN_I128_AS_POS_U128);
+
+        // results that fit are exact
+        assert_eq!(add(&Value::from(i128::MAX), &Value::from(1)).unwrap(), big);
+        assert_eq!(sub(&big, &big).unwrap(), Value::from(0));
+        assert_eq!(
+            sub(&max, &Value::from(1)).unwrap(),
+            Value::from(u128::MAX - 1)
+        );
+        assert_eq!(sub(&max, &big).unwrap(), Value::from(i128::MAX));
+        assert_eq!(add(&big, &Value::from(i128::MAX)).unwrap(), max);
+        assert_eq!(add(&max, &min).unwrap(), Value::from(i128::MAX));
+        assert_eq!(sub(&Value::from(0), &big).unwrap(), min);
+        assert_eq!(mul(&big, &Value::from(-1)).unwrap(), min);
+        assert_eq!(mul(&max, &Value::from(true)).unwrap(), max);
+        assert_eq!(rem(&max, &Value::from(10)).unwrap(), Value::from(5));
+        assert_eq!(rem(&max, &Value::from(-10)).unwrap(), Value::from(-5));
+        assert_eq!(
+            int_div(&max, &Value::from(2)).unwrap(),
+            Value::from(i128::MAX)
+        );
+        assert_eq!(int_div(&min, &Value::from(-1)).unwrap(), big);
+        assert_eq!(pow(&Value::from(2), &Value::from(127)).unwrap(), big);
+        assert_eq!(pow(&max, &Value::from(1)).unwrap(), max);
+        assert_eq!(
+            pow(&max, &Value::from(-1)).unwrap(),
+            Value::from(1.0 / u128::MAX as f64)
+        );
+        assert_eq!(
+            add(&max, &Value::from(1.0)).unwrap(),
+            Value::from(u128::MAX as f64)
+        );
+
+        // results that do not fit fail instead of wrapping
+        for (op, lhs, rhs) in [
+            (
+                add as fn(&Value, &Value) -> Result<Value, Error>,
+                &max,
+                &Value::from(1),
+            ),
+            (add, &max, &max),
+            (add, &big, &big),
+            (sub, &min, &Value::from(1)),
+            (sub, &Value::from(0), &max),
+            (mul, &max, &Value::from(-1)),
+            (mul, &max, &Value::from(2)),
+            (int_div, &max, &Value::from(-1)),
+            (int_div, &max, &Value::from(0)),
+            (rem, &max, &Value::from(0)),
+            (pow, &Value::from(2), &Value::from(128)),
+        ] {
+            let err = op(lhs, rhs).unwrap_err();
+            assert_eq!(err.kind(), ErrorKind::InvalidOperation);
+            assert!(err
+                .to_string()
+                .starts_with("invalid operation: unable to calculate"));
+        }
+
+        let err = add(&max, &Value::from("foo")).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "invalid operation: tried to use + operator on unsupported types number and string"
+        );
     }
 
     #[test]
@@ -913,10 +1146,10 @@ mod tests {
             Value::from("foobar")
         );
 
-        let err = add(&Value::from(i128::MAX), &Value::from(1)).unwrap_err();
+        let err = add(&Value::from(u128::MAX), &Value::from(1)).unwrap_err();
         assert_eq!(
             err.to_string(),
-            "invalid operation: unable to calculate 170141183460469231731687303715884105727 + 1"
+            "invalid operation: unable to calculate 340282366920938463463374607431768211455 + 1"
         );
     }
 

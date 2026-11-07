@@ -1,7 +1,9 @@
 package lexer
 
 import (
+	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"strconv"
 	"strings"
@@ -1230,13 +1232,20 @@ done:
 	if isFloat {
 		// Parse the float to get its actual value
 		floatVal, err := strconv.ParseFloat(strings.ReplaceAll(cleanNum, "_", ""), 64)
-		if err != nil {
+		// Like in Rust, a float too large for a float64 is infinity rather
+		// than an error.
+		if err != nil && !(errors.Is(err, strconv.ErrRange) && math.IsInf(floatVal, 0)) {
 			return nil, false, l.syntaxError("invalid float")
 		}
 		// Format float like Rust does (always with decimal point)
-		floatStr := strconv.FormatFloat(floatVal, 'f', -1, 64)
-		if !strings.Contains(floatStr, ".") {
-			floatStr += ".0"
+		var floatStr string
+		if math.IsInf(floatVal, 0) {
+			floatStr = "inf"
+		} else {
+			floatStr = strconv.FormatFloat(floatVal, 'f', -1, 64)
+			if !strings.Contains(floatStr, ".") {
+				floatStr += ".0"
+			}
 		}
 		tok := l.makeToken(TokenFloat, floatStr)
 		return &tok, false, nil

@@ -105,7 +105,7 @@ mod builtins {
 
     use std::borrow::Cow;
 
-    use crate::value::ops::{coerce, CoerceResult};
+    use crate::value::ops::{coerce, CoerceResult, WideInt};
     use crate::value::ValueKind;
 
     /// Return true if the object is a boolean value.
@@ -125,7 +125,10 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_odd(v: Value) -> bool {
-        i128::try_from(v).ok().is_some_and(|x| x % 2 != 0)
+        match i128::try_from(v.clone()) {
+            Ok(x) => x % 2 != 0,
+            Err(_) => WideInt::from_value(&v).is_some_and(|x| x.is_odd()),
+        }
     }
 
     /// Checks if a value is even.
@@ -135,7 +138,10 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_even(v: Value) -> bool {
-        i128::try_from(v).ok().is_some_and(|x| x % 2 == 0)
+        match i128::try_from(v.clone()) {
+            Ok(x) => x % 2 == 0,
+            Err(_) => WideInt::from_value(&v).is_some_and(|x| !x.is_odd()),
+        }
     }
 
     /// Return true if the value is divisible by another one.
@@ -146,9 +152,14 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_divisibleby(v: &Value, other: &Value) -> bool {
         match coerce(v, other, false) {
-            Some(CoerceResult::I128(a, b)) => (a % b) == 0,
+            // `wrapping_rem` only wraps for `i128::MIN % -1`, which is 0.
+            Some(CoerceResult::I128(a, b)) => b != 0 && a.wrapping_rem(b) == 0,
             Some(CoerceResult::F64(a, b)) => (a % b) == 0.0,
-            _ => false,
+            Some(CoerceResult::Str(..)) => false,
+            None => match (WideInt::from_value(v), WideInt::from_value(other)) {
+                (Some(a), Some(b)) => a.div_rem_floor(b).is_some_and(|(_, rem)| rem.is_zero()),
+                _ => false,
+            },
         }
     }
 
