@@ -1300,7 +1300,8 @@ mod builtins {
 
     /// Returns the last item from an iterable.
     ///
-    /// If the list is empty `undefined` is returned.
+    /// For maps this is the last key.  If the list is empty `undefined` is
+    /// returned.
     ///
     /// ```jinja
     /// <h2>Most Recent Update</h2>
@@ -1331,7 +1332,10 @@ mod builtins {
                     Value::from(ch)
                 }
             }))
-        } else if matches!(value.kind(), ValueKind::Seq | ValueKind::Iterable) {
+        } else if matches!(
+            value.kind(),
+            ValueKind::Seq | ValueKind::Iterable | ValueKind::Map
+        ) {
             let rev = ok!(value.reverse_with_fuel(state));
             let mut iter = ok!(rev.try_iter()).checked();
             iter.next().transpose().map(Option::unwrap_or_default)
