@@ -275,3 +275,13 @@ func TestFromAnyValueMap(t *testing.T) {
 		t.Errorf("a nil map should be none")
 	}
 }
+
+func TestMergeMapsWithValueMap(t *testing.T) {
+	m := NewMap()
+	m.Set(FromInt(1), FromString("int"))
+	m.Set(FromString("a"), FromString("str"))
+	merged := MergeMaps(FromValueMap(m), FromMap(map[string]Value{"b": FromInt(2)}))
+	if got := merged.String(); got != "{'a': 'str', 'b': 2}" {
+		t.Errorf("unexpected merged map %s", got)
+	}
+}
