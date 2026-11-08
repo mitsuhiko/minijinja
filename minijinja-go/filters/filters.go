@@ -483,6 +483,23 @@ func FilterReplace(state State, val value.Value, args []value.Value, kwargs map[
 	return value.FromString(strings.Replace(s, old, new, count)), nil
 }
 
+// usizeArg converts an argument like a usize argument in Rust: booleans count
+// as 0 and 1, floats must be integral and negative or other values fail.
+func usizeArg(v value.Value) (int, error) {
+	if b, ok := v.AsBool(); ok {
+		if b {
+			return 1, nil
+		}
+		return 0, nil
+	}
+	if f, ok := v.AsFloat(); ok && f == math.Trunc(f) && f >= 0 && f < math.MaxInt64 {
+		if n, ok := v.AsInt(); ok {
+			return int(n), nil
+		}
+	}
+	return 0, mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("cannot convert %s to usize", v.Kind()))
+}
+
 // replaceCount converts the count argument of replace like an i64 argument
 // in Rust: booleans count as 0 and 1, floats must be integral and other
 // values fail.
@@ -3548,15 +3565,19 @@ func FilterIndent(state State, val value.Value, args []value.Value, kwargs map[s
 	}
 
 	width := 4
+	widthArg, hasWidth := value.Undefined(), false
 	if len(args) > 0 {
-		if w, ok := args[0].AsInt(); ok {
-			width = int(w)
-		}
+		widthArg, hasWidth = args[0], true
 	} else if v, ok := kwargs["width"]; ok {
-		if w, ok := v.AsInt(); ok {
-			width = int(w)
-		}
+		widthArg, hasWidth = v, true
 		delete(kwargs, "width")
+	}
+	if hasWidth && !widthArg.IsNone() && !widthArg.IsUndefined() {
+		w, err := usizeArg(widthArg)
+		if err != nil {
+			return value.Undefined(), err
+		}
+		width = w
 	}
 
 	first := false
@@ -3699,22 +3720,24 @@ func FilterTojson(state State, val value.Value, args []value.Value, kwargs map[s
 
 	// Check for indent option
 	indent := ""
+	indentArgs := make([]value.Value, 0, 2)
 	if len(args) > 0 {
-		if b, ok := args[0].AsBool(); ok {
+		indentArgs = append(indentArgs, args[0])
+	}
+	if i, ok := kwargs["indent"]; ok {
+		indentArgs = append(indentArgs, i)
+	}
+	for _, i := range indentArgs {
+		if b, ok := i.AsBool(); ok {
 			if b {
 				indent = "  " // 2 spaces for true
 			}
-		} else if i, ok := args[0].AsInt(); ok {
-			indent = strings.Repeat(" ", int(i))
-		}
-	}
-	if i, ok := kwargs["indent"]; ok {
-		if b, ok := i.AsBool(); ok {
-			if b {
-				indent = "  "
+		} else if !i.IsNone() && !i.IsUndefined() {
+			n, err := usizeArg(i)
+			if err != nil {
+				return value.Undefined(), err
 			}
-		} else if n, ok := i.AsInt(); ok {
-			indent = strings.Repeat(" ", int(n))
+			indent = strings.Repeat(" ", n)
 		}
 	}
 

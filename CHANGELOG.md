@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## Unreleased
+
+* Fixed a negative width panicking in the `indent` and `tojson` filters in Go.  Like in Rust, `indent(-1)` and `tojson(indent=-1)` now fail with "cannot convert number to usize", widths that are not integers such as `2.5` or `"x"` fail instead of being ignored, and `indent(true)` indents by one space.
+
 ## 3.1.0
 
 This release adds output spans and memory limits through fuel, and fixes many
