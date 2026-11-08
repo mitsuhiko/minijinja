@@ -560,6 +560,63 @@ func TestNumberFiltersBeyondInt64(t *testing.T) {
 	}
 }
 
+func TestIndentAndTojsonWidthArguments(t *testing.T) {
+	env := NewEnvironment()
+
+	for _, test := range []struct {
+		template string
+		expected string
+	}{
+		{`{{ "a\nb"|indent(none) }}`, "a\n    b"},
+		{`{{ "a\nb"|indent(true) }}`, "a\n b"},
+		{`{{ "a\nb"|indent(2.0) }}`, "a\n  b"},
+		{`{{ [1]|tojson(indent=none) }}`, "[1]"},
+		{`{{ [1]|tojson(indent=2) }}`, "[\n  1\n]"},
+	} {
+		tmpl, err := env.TemplateFromString(test.template)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", test.template, err)
+		}
+		result, err := tmpl.Render(nil)
+		if err != nil {
+			t.Errorf("render error for %q: %v", test.template, err)
+		} else if result != test.expected {
+			t.Errorf("%q: expected %q, got %q", test.template, test.expected, result)
+		}
+	}
+
+	// Like in Rust, widths must convert to usize.  A negative width used to
+	// panic in strings.Repeat.
+	for _, test := range []struct {
+		template string
+		message  string
+	}{
+		{`{{ "a\nb"|indent(-1) }}`, "cannot convert number to usize"},
+		{`{{ "a\nb"|indent(width=-1) }}`, "cannot convert number to usize"},
+		{`{{ "a\nb"|indent(2.5) }}`, "cannot convert number to usize"},
+		{`{{ "a\nb"|indent("x") }}`, "cannot convert string to usize"},
+		{`{{ [1]|tojson(-1) }}`, "cannot convert number to usize"},
+		{`{{ [1]|tojson(indent=-1) }}`, "cannot convert number to usize"},
+		{`{{ [1]|tojson(indent="x") }}`, "cannot convert string to usize"},
+	} {
+		tmpl, err := env.TemplateFromString(test.template)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", test.template, err)
+		}
+		func() {
+			defer func() {
+				if p := recover(); p != nil {
+					t.Errorf("%q panicked: %v", test.template, p)
+				}
+			}()
+			_, err = tmpl.Render(nil)
+			if err == nil || !strings.Contains(err.Error(), test.message) {
+				t.Errorf("%q: expected error containing %q, got %v", test.template, test.message, err)
+			}
+		}()
+	}
+}
+
 func TestNumberTestsBeyondInt64(t *testing.T) {
 	env := NewEnvironment()
 
