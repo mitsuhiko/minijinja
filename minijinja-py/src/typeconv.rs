@@ -168,7 +168,7 @@ impl Kind {
 /// calculated by iterating over them.  Unlike the builtin filter, which can
 /// only report that the length is unknown, this reports an exception raised
 /// during that iteration.
-pub fn length(value: &Value) -> Result<usize, Error> {
+pub fn length(state: &State, value: &Value) -> Result<usize, Error> {
     if let Some(obj) = value.downcast_object_ref::<DynamicObject>() {
         if matches!(obj.kind, Kind::Map | Kind::Iterable) {
             if let Ok(iter) = value.try_iter() {
@@ -181,7 +181,7 @@ pub fn length(value: &Value) -> Result<usize, Error> {
             }
         }
     }
-    minijinja::filters::length(value)
+    minijinja::filters::length_checked(state, value)
 }
 
 pub struct DynamicObject {

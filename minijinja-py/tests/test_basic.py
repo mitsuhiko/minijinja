@@ -646,7 +646,61 @@ def test_attribute_lookups():
         env.eval_expr("x.foo", x=X())
 
 
-def test_failing_iterator():
+@pytest.mark.parametrize("filter_name", ["length", "count"])
+@pytest.mark.parametrize(
+    "undefined_behavior", ["lenient", "chainable", "strict", "semi_strict"]
+)
+@pytest.mark.parametrize("expr", ["nope", "([]|first)", "user.missing"])
+def test_length_undefined(filter_name, undefined_behavior, expr):
+    env = Environment(undefined_behavior=undefined_behavior)
+    template = "{{ " + expr + "|" + filter_name + " }}"
+    if undefined_behavior in ("strict", "semi_strict"):
+        with pytest.raises(TemplateError) as exc_info:
+            env.render_str(template, user={})
+        assert exc_info.value.kind == "UndefinedError"
+    else:
+        assert env.render_str(template, user={}) == "0"
+
+
+@pytest.mark.parametrize("filter_name", ["length", "count"])
+@pytest.mark.parametrize(
+    "undefined_behavior", ["lenient", "chainable", "strict", "semi_strict"]
+)
+@pytest.mark.parametrize(
+    ("expr", "expected"),
+    [
+        ("('x' if false)", "0"),  # silent undefined is allowed even in strict mode
+        ("(nope|default([]))", "0"),
+        ("[]", "0"),
+        ("[1, 2]", "2"),
+        ("'hé🐍'", "3"),
+        ("items", "2"),  # Python iterators are counted by the binding
+    ],
+)
+def test_length_values(filter_name, undefined_behavior, expr, expected):
+    env = Environment(undefined_behavior=undefined_behavior)
+    assert (
+        env.render_str("{{ " + expr + "|" + filter_name + " }}", items=iter([1, 2]))
+        == expected
+    )
+
+
+@pytest.mark.parametrize("filter_name", ["length", "count"])
+@pytest.mark.parametrize(
+    "undefined_behavior", ["lenient", "chainable", "strict", "semi_strict"]
+)
+@pytest.mark.parametrize("expr", ["none", "42"])
+def test_length_invalid_values(filter_name, undefined_behavior, expr):
+    env = Environment(undefined_behavior=undefined_behavior)
+    with pytest.raises(TemplateError) as exc_info:
+        env.render_str("{{ " + expr + "|" + filter_name + " }}")
+    assert exc_info.value.kind == "InvalidOperation"
+
+
+@pytest.mark.parametrize(
+    "undefined_behavior", ["lenient", "chainable", "strict", "semi_strict"]
+)
+def test_failing_iterator(undefined_behavior):
     class Broken:
         def __init__(self, n):
             self.n = n
@@ -660,12 +714,13 @@ def test_failing_iterator():
                 return self.n
             raise ValueError("backend unavailable")
 
-    env = Environment()
+    env = Environment(undefined_behavior=undefined_behavior)
     for template in [
         "{% for x in items %}{{ x }}{% endfor %}",
         "{{ items|list }}",
         "{{ items|join(',') }}",
         "{{ items|length }}",
+        "{{ items|count }}",
         "{{ items|sort }}",
         "{{ items|tojson }}",
         "{{ 5 in items }}",

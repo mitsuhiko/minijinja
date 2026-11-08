@@ -505,6 +505,9 @@ mod builtins {
     /// Like in Jinja2, undefined values have a length of `0` unless strict
     /// undefined behavior is used.
     ///
+    /// When called directly from Rust, this function does not check the
+    /// environment's undefined behavior.  Use [`length_checked`] for that.
+    ///
     /// ```jinja
     /// <p>Search results: {{ results|length }}
     /// ```
@@ -522,7 +525,13 @@ mod builtins {
         })
     }
 
-    pub(crate) fn length_checked(state: &State, v: &Value) -> Result<usize, Error> {
+    /// Like [`length`], but respects the environment's undefined behavior.
+    ///
+    /// This is the implementation registered for the `length` and `count`
+    /// filters.  Ordinary undefined values fail in strict and semi-strict
+    /// mode, while silent undefined values still have a length of `0`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn length_checked(state: &State, v: &Value) -> Result<usize, Error> {
         ok!(state.undefined_behavior().assert_iterable(v));
         length(v)
     }
