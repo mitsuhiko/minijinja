@@ -4,6 +4,7 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Fixed slicing and `range()` in Go ignoring arguments that are not integers.  Like in Rust, `[1, 2, 3][1.5:]`, `[1, 2, 3]["a":]` and `range(1.5)` now fail with "cannot convert number to i64" (or `isize` for `range`) instead of ignoring the bound, booleans count as 0 and 1, `range(none)` and `range()` with more than three arguments fail, and floats beyond the 64-bit range are no longer converted to `-9223372036854775808`.
 * Fixed a negative width panicking in the `indent` and `tojson` filters in Go.  Like in Rust, `indent(-1)` and `tojson(indent=-1)` now fail with "cannot convert number to usize", widths that are not integers such as `2.5` or `"x"` fail instead of being ignored, and `indent(true)` indents by one space.
 
 ## 3.1.0

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"slices"
 	"sort"
 	"strings"
@@ -3410,7 +3411,11 @@ func (s *State) evalSlice(sl *parser.Slice) (value.Value, error) {
 		if err != nil {
 			return value.Undefined(), err
 		}
-		if i, ok := v.AsInt(); ok {
+		if !v.IsNone() && !v.IsUndefined() {
+			i, err := intArg(v, "i64")
+			if err != nil {
+				return value.Undefined(), err
+			}
 			start = &i
 		}
 	}
@@ -3420,7 +3425,11 @@ func (s *State) evalSlice(sl *parser.Slice) (value.Value, error) {
 		if err != nil {
 			return value.Undefined(), err
 		}
-		if i, ok := v.AsInt(); ok {
+		if !v.IsNone() && !v.IsUndefined() {
+			i, err := intArg(v, "i64")
+			if err != nil {
+				return value.Undefined(), err
+			}
 			stop = &i
 		}
 	}
@@ -3430,7 +3439,11 @@ func (s *State) evalSlice(sl *parser.Slice) (value.Value, error) {
 		if err != nil {
 			return value.Undefined(), err
 		}
-		if i, ok := v.AsInt(); ok {
+		if !v.IsNone() && !v.IsUndefined() {
+			i, err := intArg(v, "i64")
+			if err != nil {
+				return value.Undefined(), err
+			}
 			step = i
 		}
 	}
@@ -3440,6 +3453,24 @@ func (s *State) evalSlice(sl *parser.Slice) (value.Value, error) {
 		return rv, err
 	}
 	return rv, s.chargeValue(rv)
+}
+
+// intArg converts an argument like an integer argument in Rust: booleans count
+// as 0 and 1, floats must be integral and within the int64 range, and other
+// values fail with an error naming the Rust type.
+func intArg(v value.Value, typeName string) (int64, error) {
+	if b, ok := v.AsBool(); ok {
+		if b {
+			return 1, nil
+		}
+		return 0, nil
+	}
+	if f, ok := v.AsFloat(); ok && f == math.Trunc(f) && f >= math.MinInt64 && f < math.MaxInt64 {
+		if i, ok := v.AsInt(); ok {
+			return i, nil
+		}
+	}
+	return 0, NewError(ErrInvalidOperation, fmt.Sprintf("cannot convert %s to %s", v.Kind(), typeName))
 }
 
 func (s *State) sliceValue(val value.Value, start, stop *int64, step int64) (value.Value, error) {

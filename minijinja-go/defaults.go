@@ -134,18 +134,29 @@ func registerDefaultFunctions(env *Environment) {
 func fnRange(state *State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	var start, stop, step int64 = 0, 0, 1
 
-	switch len(args) {
-	case 1:
-		stop, _ = args[0].AsInt()
-	case 2:
-		start, _ = args[0].AsInt()
-		stop, _ = args[1].AsInt()
-	case 3:
-		start, _ = args[0].AsInt()
-		stop, _ = args[1].AsInt()
-		step, _ = args[2].AsInt()
-	default:
+	if len(args) == 0 {
 		return value.FromIterator(value.NewIterator("range", nil)), nil
+	}
+	if len(args) > 3 {
+		return value.Undefined(), NewError(ErrTooManyArguments, "too many arguments")
+	}
+	// Like in Rust, the arguments are converted like isize arguments, and
+	// `none` for the upper bound or step means that it was not given.
+	lower, err := intArg(args[0], "isize")
+	if err != nil {
+		return value.Undefined(), err
+	}
+	stop = lower
+	if len(args) > 1 && !args[1].IsNone() && !args[1].IsUndefined() {
+		start = lower
+		if stop, err = intArg(args[1], "isize"); err != nil {
+			return value.Undefined(), err
+		}
+	}
+	if len(args) > 2 && !args[2].IsNone() && !args[2].IsUndefined() {
+		if step, err = intArg(args[2], "isize"); err != nil {
+			return value.Undefined(), err
+		}
 	}
 
 	if step == 0 {

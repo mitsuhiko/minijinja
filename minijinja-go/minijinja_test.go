@@ -560,6 +560,63 @@ func TestNumberFiltersBeyondInt64(t *testing.T) {
 	}
 }
 
+func TestSliceAndRangeIntegerArguments(t *testing.T) {
+	env := NewEnvironment()
+
+	for _, test := range []struct {
+		template string
+		expected string
+	}{
+		{"{{ [1, 2, 3][1.0:] }}", "[2, 3]"},
+		{"{{ [1, 2, 3][none:] }}", "[1, 2, 3]"},
+		{"{{ [1, 2, 3][true:] }}", "[2, 3]"},
+		{"{{ range(2.0)|list }}", "[0, 1]"},
+		{"{{ range(true)|list }}", "[0]"},
+		{"{{ range(1, 5, none)|list }}", "[1, 2, 3, 4]"},
+		{"{{ range(0, none)|list }}", "[]"},
+	} {
+		tmpl, err := env.TemplateFromString(test.template)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", test.template, err)
+		}
+		result, err := tmpl.Render(nil)
+		if err != nil {
+			t.Errorf("render error for %q: %v", test.template, err)
+		} else if result != test.expected {
+			t.Errorf("%q: expected %q, got %q", test.template, test.expected, result)
+		}
+	}
+
+	// Like in Rust, values that do not convert to an integer fail instead of
+	// being ignored.
+	for _, test := range []struct {
+		template string
+		message  string
+	}{
+		{"{{ [1, 2, 3][1.5:] }}", "cannot convert number to i64"},
+		{`{{ [1, 2, 3]["a":] }}`, "cannot convert string to i64"},
+		{`{{ "abc"[:1.5] }}`, "cannot convert number to i64"},
+		{"{{ [1, 2, 3][::1e30] }}", "cannot convert number to i64"},
+		{"{{ [1, 2, 3][:1e19] }}", "cannot convert number to i64"},
+		{"{{ [1, 2, 3][18446744073709551616:] }}", "cannot convert number to i64"},
+		{"{{ range(1.5)|list }}", "cannot convert number to isize"},
+		{`{{ range("a")|list }}`, "cannot convert string to isize"},
+		{"{{ range(none)|list }}", "cannot convert none to isize"},
+		{"{{ range(1e30)|list }}", "cannot convert number to isize"},
+		{"{{ range(0, 1e30, 1e29)|list }}", "cannot convert number to isize"},
+		{"{{ range(1, 2, 3, 4)|list }}", "too many arguments"},
+	} {
+		tmpl, err := env.TemplateFromString(test.template)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", test.template, err)
+		}
+		_, err = tmpl.Render(nil)
+		if err == nil || !strings.Contains(err.Error(), test.message) {
+			t.Errorf("%q: expected error containing %q, got %v", test.template, test.message, err)
+		}
+	}
+}
+
 func TestIndentAndTojsonWidthArguments(t *testing.T) {
 	env := NewEnvironment()
 
