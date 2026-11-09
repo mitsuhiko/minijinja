@@ -1232,7 +1232,9 @@ func (v Value) AsInt() (int64, bool) {
 	case int64:
 		return d, true
 	case float64:
-		if d == math.Trunc(d) {
+		// Floats outside of the int64 range have no int64 value; converting
+		// them gives an implementation-defined result.
+		if d == math.Trunc(d) && d >= math.MinInt64 && d < math.MaxInt64 {
 			return int64(d), true
 		}
 		return 0, false

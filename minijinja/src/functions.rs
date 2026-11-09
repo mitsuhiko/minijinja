@@ -452,13 +452,18 @@ mod builtins {
                     None => (0, lower),
                 };
 
+                // the distance between the bounds and the negated step can
+                // exceed the isize range, so compute the length unsigned.
                 let len = if start <= end {
                     0
                 } else {
-                    ((start - end + (-step) - 1) / (-step)) as usize
+                    (start.abs_diff(end) - 1) / step.unsigned_abs() + 1
                 };
 
-                let iter = (0..len).map(move |i| start + (i as isize) * step);
+                // every item is within the bounds, so wrapping arithmetic
+                // gives the right value even if `i * step` overflows.
+                let iter =
+                    (0..len).map(move |i| start.wrapping_add((i as isize).wrapping_mul(step)));
                 to_result(iter)
             }
         }

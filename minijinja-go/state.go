@@ -3410,7 +3410,11 @@ func (s *State) evalSlice(sl *parser.Slice) (value.Value, error) {
 		if err != nil {
 			return value.Undefined(), err
 		}
-		if i, ok := v.AsInt(); ok {
+		if !v.IsNone() {
+			i, err := intArg(v, "i64")
+			if err != nil {
+				return value.Undefined(), err
+			}
 			start = &i
 		}
 	}
@@ -3420,7 +3424,11 @@ func (s *State) evalSlice(sl *parser.Slice) (value.Value, error) {
 		if err != nil {
 			return value.Undefined(), err
 		}
-		if i, ok := v.AsInt(); ok {
+		if !v.IsNone() {
+			i, err := intArg(v, "i64")
+			if err != nil {
+				return value.Undefined(), err
+			}
 			stop = &i
 		}
 	}
@@ -3430,7 +3438,11 @@ func (s *State) evalSlice(sl *parser.Slice) (value.Value, error) {
 		if err != nil {
 			return value.Undefined(), err
 		}
-		if i, ok := v.AsInt(); ok {
+		if !v.IsNone() {
+			i, err := intArg(v, "i64")
+			if err != nil {
+				return value.Undefined(), err
+			}
 			step = i
 		}
 	}
@@ -3442,9 +3454,25 @@ func (s *State) evalSlice(sl *parser.Slice) (value.Value, error) {
 	return rv, s.chargeValue(rv)
 }
 
+// intArg converts an argument like an integer argument in Rust: booleans count
+// as 0 and 1, floats must be integral and within the int64 range, and other
+// values fail with an error naming the Rust type.
+func intArg(v value.Value, typeName string) (int64, error) {
+	if b, ok := v.AsBool(); ok {
+		if b {
+			return 1, nil
+		}
+		return 0, nil
+	}
+	if i, ok := v.AsInt(); ok {
+		return i, nil
+	}
+	return 0, NewError(ErrInvalidOperation, fmt.Sprintf("cannot convert %s to %s", v.Kind(), typeName))
+}
+
 func (s *State) sliceValue(val value.Value, start, stop *int64, step int64) (value.Value, error) {
 	if step == 0 {
-		return value.Undefined(), fmt.Errorf("slice step cannot be zero")
+		return value.Undefined(), NewError(ErrInvalidOperation, "cannot slice by step size of 0")
 	}
 
 	switch {
@@ -3492,18 +3520,15 @@ func sliceSlice(items []value.Value, start, stop *int64, step int64) []value.Val
 	length := int64(len(items))
 	s, e := resolveSliceIndices(length, start, stop, step)
 
-	var result []value.Value
-	if n := sliceCount(s, e, step); n > 0 {
-		result = make([]value.Value, 0, n)
+	n := sliceCount(s, e, step)
+	if n == 0 {
+		return nil
 	}
-	if step > 0 {
-		for i := s; i < e; i += step {
-			result = append(result, items[i])
-		}
-	} else {
-		for i := s; i > e; i += step {
-			result = append(result, items[i])
-		}
+	// counting the items instead of comparing the index against the end
+	// keeps a large step from overflowing the index.
+	result := make([]value.Value, 0, n)
+	for i := int64(0); i < n; i++ {
+		result = append(result, items[s+i*step])
 	}
 	return result
 }
@@ -3631,8 +3656,8 @@ func (s *State) sliceString(str string, start, stop *int64, step int64) (string,
 		// ASCII
 		var b strings.Builder
 		b.Grow(int(count))
-		for i := lo; i > hi; i += step {
-			b.WriteByte(str[i])
+		for i := int64(0); i < count; i++ {
+			b.WriteByte(str[lo+i*step])
 		}
 		return b.String(), nil
 	}
@@ -3654,13 +3679,15 @@ func (s *State) sliceString(str string, start, stop *int64, step int64) (string,
 	return string(picked), nil
 }
 
-// sliceCount returns how many items a slice selects.
+// sliceCount returns how many items a slice selects.  The resolved indices are
+// within the sequence, but the step can be any int64, so the step is not added
+// to the distance and is negated as an unsigned value.
 func sliceCount(s, e, step int64) int64 {
 	if step > 0 && s < e {
-		return (e - s + step - 1) / step
+		return (e-s-1)/step + 1
 	}
 	if step < 0 && s > e {
-		return (s - e - step - 1) / -step
+		return int64(uint64(s-e-1)/uint64(-step) + 1)
 	}
 	return 0
 }

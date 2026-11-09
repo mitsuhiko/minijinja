@@ -4,6 +4,9 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Fixed slicing and `range()` in Go ignoring arguments that are not integers.  Like in Rust, `[1, 2, 3][1.5:]`, `[1, 2, 3]["a":]` and `range(1.5)` now fail with "cannot convert number to i64" (or `isize` for `range`) instead of ignoring the bound, undefined slice bounds fail instead of being ignored, booleans count as 0 and 1, `range(none)`, `range()`, `range()` with keyword arguments and `range()` with more than three arguments fail, and floats beyond the 64-bit range are no longer converted to `-9223372036854775808`.  The errors for a step of 0 now match Rust as well.
+* Fixed slicing and `range()` in Go panicking or giving wrong results for steps and bounds near the 64-bit integer limits, such as `[1, 2, 3][1::9223372036854775807]` or `range(9223372036854775807, -1, -4611686018427387904)`.
+* Fixed slicing with a step of `-9223372036854775808` and `range()` with bounds or steps near the 64-bit integer limits overflowing in Rust.  This panicked with overflow checks enabled, and without them `range(9223372036854775807, -1, -4611686018427387904)` failed with "range has too many elements" and `range(0, -5, -9223372036854775808)` was empty.  Slicing with a step of `4294967296` or more no longer panics on 32-bit targets such as WebAssembly.
 * Fixed a negative width panicking in the `indent` and `tojson` filters in Go.  Like in Rust, `indent(-1)` and `tojson(indent=-1)` now fail with "cannot convert number to usize", widths that are not integers such as `2.5` or `"x"` fail instead of being ignored, and `indent(true)` indents by one space.
 
 ## 3.1.0

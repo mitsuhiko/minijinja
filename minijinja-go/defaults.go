@@ -134,34 +134,47 @@ func registerDefaultFunctions(env *Environment) {
 func fnRange(state *State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	var start, stop, step int64 = 0, 0, 1
 
-	switch len(args) {
-	case 1:
-		stop, _ = args[0].AsInt()
-	case 2:
-		start, _ = args[0].AsInt()
-		stop, _ = args[1].AsInt()
-	case 3:
-		start, _ = args[0].AsInt()
-		stop, _ = args[1].AsInt()
-		step, _ = args[2].AsInt()
-	default:
-		return value.FromIterator(value.NewIterator("range", nil)), nil
+	// Like in Rust, keyword arguments are passed as a trailing map, which
+	// then fails to convert to an integer or is one argument too many.
+	if len(kwargs) > 0 {
+		args = append(args[:len(args):len(args)], value.FromMap(kwargs))
+	}
+	if len(args) == 0 {
+		return value.Undefined(), NewError(ErrMissingArgument, "missing argument")
+	}
+	if len(args) > 3 {
+		return value.Undefined(), NewError(ErrTooManyArguments, "too many arguments")
+	}
+	// Like in Rust, the arguments are converted like isize arguments, and
+	// `none` for the upper bound or step means that it was not given.
+	lower, err := intArg(args[0], "isize")
+	if err != nil {
+		return value.Undefined(), err
+	}
+	stop = lower
+	if len(args) > 1 && !args[1].IsNone() && !args[1].IsUndefined() {
+		start = lower
+		if stop, err = intArg(args[1], "isize"); err != nil {
+			return value.Undefined(), err
+		}
+	}
+	if len(args) > 2 && !args[2].IsNone() && !args[2].IsUndefined() {
+		if step, err = intArg(args[2], "isize"); err != nil {
+			return value.Undefined(), err
+		}
 	}
 
 	if step == 0 {
-		return value.Undefined(), fmt.Errorf("range step cannot be zero")
+		return value.Undefined(), NewError(ErrInvalidOperation, "cannot create range with step of 0")
 	}
 
-	length := int64(0)
-	if step > 0 {
-		if stop > start {
-			length = (stop - start + step - 1) / step
-		}
-	} else {
-		if stop < start {
-			negStep := -step
-			length = (start - stop + negStep - 1) / negStep
-		}
+	// the distance between the bounds and the negated step can exceed the
+	// int64 range, so the length is computed with unsigned values.
+	var length uint64
+	if step > 0 && stop > start {
+		length = (uint64(stop)-uint64(start)-1)/uint64(step) + 1
+	} else if step < 0 && stop < start {
+		length = (uint64(start)-uint64(stop)-1)/(-uint64(step)) + 1
 	}
 	if length > 100000 {
 		return value.Undefined(), NewError(ErrInvalidOperation, "range has too many elements")
@@ -172,15 +185,10 @@ func fnRange(state *State, args []value.Value, kwargs map[string]value.Value) (v
 		return value.Undefined(), err
 	}
 
+	// counting the items keeps the last step from overflowing the value.
 	result := make([]value.Value, 0, length)
-	if step > 0 {
-		for i := start; i < stop; i += step {
-			result = append(result, value.FromInt(i))
-		}
-	} else {
-		for i := start; i > stop; i += step {
-			result = append(result, value.FromInt(i))
-		}
+	for i := uint64(0); i < length; i++ {
+		result = append(result, value.FromInt(start+int64(i)*step))
 	}
 	return value.FromIterator(value.NewIterator("range", result)), nil
 }
