@@ -256,7 +256,7 @@ fn get_offset_and_len<F: FnOnce() -> usize>(
 fn range_step_backwards(
     start: Option<i64>,
     stop: Option<i64>,
-    step: usize,
+    step: u64,
     end: usize,
 ) -> impl Iterator<Item = usize> {
     // Like Python, clamp both bounds to `-1..=end - 1` and walk down from
@@ -272,11 +272,11 @@ fn range_step_backwards(
     let start = start.map_or(end - 1, clamp);
     let stop = stop.map_or(-1, clamp);
     let length = if start > stop {
-        ((start - stop - 1) as u64 / step as u64 + 1) as usize
+        ((start - stop - 1) as u64 / step + 1) as usize
     } else {
         0
     };
-    (0..length).map(move |i| (start as u64 - i as u64 * step as u64) as usize)
+    (0..length).map(move |i| (start as u64 - i as u64 * step) as usize)
 }
 
 /// Slices a value.
@@ -311,6 +311,9 @@ pub fn slice(
             "cannot slice by step size of 0",
         ));
     }
+    // a forward step larger than `usize` (on 32-bit targets) only selects the
+    // first item, like the largest `usize` step.
+    let forward_step = usize::try_from(step).unwrap_or(usize::MAX);
 
     let kind = value.kind();
     let is_tuple = value.is_tuple();
@@ -352,13 +355,13 @@ pub fn slice(
                     s.chars()
                         .skip(start)
                         .take(len)
-                        .step_by(step as usize)
+                        .step_by(forward_step)
                         .collect::<String>(),
                 ))
             } else {
                 let chars: Vec<char> = s.chars().collect();
                 Ok(Value::from(
-                    range_step_backwards(start, stop, -step as usize, chars.len())
+                    range_step_backwards(start, stop, step.unsigned_abs(), chars.len())
                         .map(move |i| chars[i])
                         .collect::<String>(),
                 ))
@@ -371,13 +374,13 @@ pub fn slice(
                     b.iter()
                         .skip(start)
                         .take(len)
-                        .step_by(step as usize)
+                        .step_by(forward_step)
                         .copied()
                         .collect(),
                 ))
             } else {
                 Ok(Value::from_bytes(
-                    range_step_backwards(start, stop, -step as usize, b.len())
+                    range_step_backwards(start, stop, step.unsigned_abs(), b.len())
                         .map(|i| b[i])
                         .collect::<Vec<u8>>(),
                 ))
@@ -396,10 +399,10 @@ pub fn slice(
                         .into_iter()
                         .skip(start)
                         .take(len)
-                        .step_by(step as usize)
+                        .step_by(forward_step)
                         .collect()
                 } else {
-                    range_step_backwards(start, stop, -step as usize, values.len())
+                    range_step_backwards(start, stop, step.unsigned_abs(), values.len())
                         .map(|idx| values[idx].clone())
                         .collect()
                 };
@@ -411,7 +414,7 @@ pub fn slice(
                 let (start, len) = get_offset_and_len(start, stop, || len);
                 Ok(Value::make_object_iterable(obj, move |obj| {
                     if let Some(iter) = obj.try_iter() {
-                        Box::new(iter.skip(start).take(len).step_by(step as usize))
+                        Box::new(iter.skip(start).take(len).step_by(forward_step))
                     } else {
                         Box::new(None.into_iter())
                     }
@@ -420,7 +423,7 @@ pub fn slice(
                 // sequences can be indexed, so they can be sliced lazily
                 Ok(Value::make_object_iterable(obj, move |obj| {
                     Box::new(
-                        range_step_backwards(start, stop, -step as usize, len)
+                        range_step_backwards(start, stop, step.unsigned_abs(), len)
                             .map(move |idx| obj.get_value(&Value::from(idx)).unwrap_or_default()),
                     )
                 }))
@@ -432,7 +435,7 @@ pub fn slice(
                 if let Some(err) = items.last().and_then(|x| x.check().err()) {
                     return Err(err);
                 }
-                let indexes = range_step_backwards(start, stop, -step as usize, items.len());
+                let indexes = range_step_backwards(start, stop, step.unsigned_abs(), items.len());
                 let items = collect_untrusted(indexes.map(|idx| items[idx].clone()));
                 Ok(Value::make_object_iterable(items, |items| {
                     Box::new(items.iter().cloned())

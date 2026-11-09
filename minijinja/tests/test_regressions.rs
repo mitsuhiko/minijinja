@@ -218,3 +218,65 @@ fn test_loop_recursion_from_other_instructions() {
     .unwrap();
     assert!(env.get_template("inf").unwrap().render(()).is_err());
 }
+
+#[test]
+fn test_slice_steps_near_integer_limits() {
+    let env = Environment::new();
+    for (template, expected) in [
+        ("{{ [1, 2, 3][::-9223372036854775808] }}", "[3]"),
+        ("{{ (1, 2, 3)[::-9223372036854775808] }}", "(3,)"),
+        ("{{ \"abc\"[::-9223372036854775808] }}", "c"),
+        ("{{ \"äbc\"[::-9223372036854775808] }}", "c"),
+        ("{{ range(3)[::-9223372036854775808]|list }}", "[2]"),
+        ("{{ [1, 2, 3][1::9223372036854775807] }}", "[2]"),
+        ("{{ \"abc\"[1::9223372036854775807] }}", "b"),
+        ("{{ range(3)[1::9223372036854775807]|list }}", "[1]"),
+        ("{{ [1, 2, 3][::4294967296] }}", "[1]"),
+        ("{{ \"abc\"[::4294967296] }}", "a"),
+        ("{{ range(3)[::4294967296]|list }}", "[0]"),
+    ] {
+        assert_eq!(
+            env.render_str(template, ()).unwrap(),
+            expected,
+            "{template}"
+        );
+    }
+}
+
+#[test]
+#[cfg(target_pointer_width = "64")]
+fn test_range_near_integer_limits() {
+    let env = Environment::new();
+    for (template, expected) in [
+        ("{{ range(0, -5, -9223372036854775808)|list }}", "[0]"),
+        (
+            "{{ range(9223372036854775807, -1, -4611686018427387904)|list }}",
+            "[9223372036854775807, 4611686018427387903]",
+        ),
+        (
+            "{{ range(9223372036854775807, -9223372036854775808, -4611686018427387904)|list }}",
+            "[9223372036854775807, 4611686018427387903, -1, -4611686018427387905]",
+        ),
+        (
+            "{{ range(-9223372036854775808, 9223372036854775807, 4611686018427387904)|list }}",
+            "[-9223372036854775808, -4611686018427387904, 0, 4611686018427387904]",
+        ),
+    ] {
+        assert_eq!(
+            env.render_str(template, ()).unwrap(),
+            expected,
+            "{template}"
+        );
+    }
+
+    let err = env
+        .render_str(
+            "{{ range(9223372036854775807, -9223372036854775808, -1)|list }}",
+            (),
+        )
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("range has too many elements"),
+        "{err}"
+    );
+}

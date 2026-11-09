@@ -574,6 +574,23 @@ func TestSliceAndRangeIntegerArguments(t *testing.T) {
 		{"{{ range(true)|list }}", "[0]"},
 		{"{{ range(1, 5, none)|list }}", "[1, 2, 3, 4]"},
 		{"{{ range(0, none)|list }}", "[]"},
+		{"{{ range(3, undefined_var)|list }}", "[0, 1, 2]"},
+		// integers near the int64 limits are not converted through floats
+		{"{{ [1, 2, 3][:9223372036854775807] }}", "[1, 2, 3]"},
+		{"{{ [1, 2, 3][9223372036854775807:] }}", "[]"},
+		{"{{ range(9223372036854775800, 9223372036854775803)|list }}",
+			"[9223372036854775800, 9223372036854775801, 9223372036854775802]"},
+		// steps and bounds near the int64 limits do not overflow
+		{"{{ [1, 2, 3][1::9223372036854775807] }}", "[2]"},
+		{"{{ range(3)[1::9223372036854775807]|list }}", "[1]"},
+		{"{{ [1, 2, 3][::-9223372036854775808] }}", "[3]"},
+		{`{{ "abc"[::-9223372036854775807] }}`, "c"},
+		{`{{ "äbc"[::-9223372036854775808] }}`, "c"},
+		{"{{ range(0, -5, -9223372036854775808)|list }}", "[0]"},
+		{"{{ range(9223372036854775807, -1, -4611686018427387904)|list }}",
+			"[9223372036854775807, 4611686018427387903]"},
+		{"{{ range(-9223372036854775808, 9223372036854775807, 4611686018427387904)|list }}",
+			"[-9223372036854775808, -4611686018427387904, 0, 4611686018427387904]"},
 	} {
 		tmpl, err := env.TemplateFromString(test.template)
 		if err != nil {
@@ -605,6 +622,16 @@ func TestSliceAndRangeIntegerArguments(t *testing.T) {
 		{"{{ range(1e30)|list }}", "cannot convert number to isize"},
 		{"{{ range(0, 1e30, 1e29)|list }}", "cannot convert number to isize"},
 		{"{{ range(1, 2, 3, 4)|list }}", "too many arguments"},
+		{"{{ range()|list }}", "missing argument"},
+		{"{{ range(stop=3)|list }}", "cannot convert map to isize"},
+		{"{{ range(3, step=2)|list }}", "cannot convert map to isize"},
+		{"{{ range(1, 2, 3, step=1)|list }}", "too many arguments"},
+		{"{{ range(0, 5, 0)|list }}", "cannot create range with step of 0"},
+		{"{{ range(9223372036854775807, -9223372036854775808, -1)|list }}", "range has too many elements"},
+		{"{{ [1, 2, 3][undefined_var:] }}", "cannot convert undefined to i64"},
+		{"{{ [1, 2, 3][:undefined_var] }}", "cannot convert undefined to i64"},
+		{"{{ [1, 2, 3][::undefined_var] }}", "cannot convert undefined to i64"},
+		{"{{ [1, 2, 3][::0] }}", "cannot slice by step size of 0"},
 	} {
 		tmpl, err := env.TemplateFromString(test.template)
 		if err != nil {
