@@ -1,5 +1,6 @@
 use std::any::Any;
 use std::borrow::Cow;
+use std::cell::Cell;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -305,13 +306,18 @@ fn default_render(obj: &DynObject, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match obj.repr() {
         ObjectRepr::Map => render_container(f, "{...}", |f| {
             let mut dbg = f.debug_map();
+            let written = Cell::new(false);
             for (idx, (key, value)) in obj.try_iter_pairs().into_iter().flatten().enumerate() {
                 if is_over_item_limit(idx) {
                     let count = obj.enumerator_len().map(|x| x - idx);
                     dbg.entry(&OmittedKey, &Omitted { count, prefix: "" });
                     break;
                 }
-                dbg.entry(&key, &value);
+                written.set(false);
+                dbg.entry(&key, &TrackWritten(&value, &written));
+                if !written.get() {
+                    break;
+                }
             }
             dbg.finish()
         }),
@@ -321,6 +327,7 @@ fn default_render(obj: &DynObject, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         ObjectRepr::Seq | ObjectRepr::Iterable if obj.enumerator_len().is_some() => {
             render_container(f, "[...]", |f| {
                 let mut dbg = f.debug_list();
+                let written = Cell::new(false);
                 for (idx, value) in obj.try_iter().into_iter().flatten().enumerate() {
                     if is_over_item_limit(idx) {
                         let count = obj.enumerator_len().map(|x| x - idx);
@@ -330,7 +337,11 @@ fn default_render(obj: &DynObject, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                         });
                         break;
                     }
-                    dbg.entry(&value);
+                    written.set(false);
+                    dbg.entry(&TrackWritten(&value, &written));
+                    if !written.get() {
+                        break;
+                    }
                 }
                 dbg.finish()
             })
@@ -355,6 +366,23 @@ fn render_container(
     {
         let _ = placeholder;
         items(f)
+    }
+}
+
+/// Formats a container entry and records whether it was written.
+///
+/// `DebugList` and `DebugMap` stop writing once the output fails, but they keep
+/// accepting entries, so the render loops above would otherwise pull every
+/// remaining item of a long or lazily computed sequence after the write already
+/// failed.  An entry that is skipped because of an earlier failure is never
+/// formatted, so the flag stays unset in that case as well.
+struct TrackWritten<'a>(&'a Value, &'a Cell<bool>);
+
+impl fmt::Debug for TrackWritten<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let rv = fmt::Debug::fmt(self.0, f);
+        self.1.set(rv.is_ok());
+        rv
     }
 }
 
