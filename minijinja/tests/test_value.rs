@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 #[cfg(feature = "std_collections")]
 use std::collections::{BTreeSet, HashMap, HashSet, LinkedList, VecDeque};
 use std::fmt;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use insta::{assert_debug_snapshot, assert_snapshot};
@@ -1540,4 +1541,59 @@ fn test_custom_object_compare() {
 
     let rv = render!("{{ seq|sort|join('|') }}", seq);
     assert_eq!(rv, "0|1|2|3|4");
+}
+
+/// A `fmt::Write` that fails when a write exceeds its remaining byte budget.
+struct FailAfter(usize);
+
+impl fmt::Write for FailAfter {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.0 = self.0.checked_sub(s.len()).ok_or(fmt::Error)?;
+        Ok(())
+    }
+}
+
+/// A sequence or map of `len` integers that counts every item it produces.
+#[derive(Debug)]
+struct CountedItems {
+    repr: ObjectRepr,
+    len: usize,
+    reads: AtomicUsize,
+}
+
+impl Object for CountedItems {
+    fn repr(self: &Arc<Self>) -> ObjectRepr {
+        self.repr
+    }
+
+    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+        let idx = key.as_usize().filter(|idx| *idx < self.len)?;
+        self.reads.fetch_add(1, Ordering::Relaxed);
+        Some(Value::from(idx))
+    }
+
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        match self.repr {
+            ObjectRepr::Map => Enumerator::Iter(Box::new((0..self.len).map(Value::from))),
+            _ => Enumerator::Seq(self.len),
+        }
+    }
+}
+
+#[test]
+fn test_render_stops_pulling_items_after_a_write_error() {
+    for repr in [ObjectRepr::Seq, ObjectRepr::Map] {
+        let items = Arc::new(CountedItems {
+            repr,
+            len: 1_000_000,
+            reads: AtomicUsize::new(0),
+        });
+        let value = Value::from_dyn_object(items.clone());
+        assert!(fmt::write(&mut FailAfter(64), format_args!("{value}")).is_err());
+        let reads = items.reads.load(Ordering::Relaxed);
+        assert!(
+            reads < 100,
+            "{repr:?}: {reads} items read after the write failed"
+        );
+    }
 }
