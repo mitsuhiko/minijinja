@@ -560,6 +560,40 @@ func TestNumberFiltersBeyondInt64(t *testing.T) {
 	}
 }
 
+func TestCompareNoneAndUndefined(t *testing.T) {
+	env := NewEnvironment()
+
+	// Like in Rust, none and undefined are equal to themselves when ordered.
+	for _, test := range []struct {
+		template string
+		expected string
+	}{
+		{"{{ none < none }}", "False"},
+		{"{{ none <= none }}", "True"},
+		{"{{ none > none }}", "False"},
+		{"{{ none >= none }}", "True"},
+		{"{{ undefined_var < undefined_var }}", "False"},
+		{"{{ undefined_var <= other_var }}", "True"},
+		{"{{ undefined_var >= other_var }}", "True"},
+		{"{{ none is lt(none) }}", "False"},
+		{"{{ none is le(none) }}", "True"},
+		{"{{ undefined_var is ge(other_var) }}", "True"},
+		{"{{ undefined_var < none }}", "True"},
+		{"{{ none < undefined_var }}", "False"},
+	} {
+		tmpl, err := env.TemplateFromString(test.template)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", test.template, err)
+		}
+		result, err := tmpl.Render(nil)
+		if err != nil {
+			t.Errorf("render error for %q: %v", test.template, err)
+		} else if result != test.expected {
+			t.Errorf("%q: expected %q, got %q", test.template, test.expected, result)
+		}
+	}
+}
+
 func TestSliceAndRangeIntegerArguments(t *testing.T) {
 	env := NewEnvironment()
 
