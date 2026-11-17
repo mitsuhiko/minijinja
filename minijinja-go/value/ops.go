@@ -726,6 +726,12 @@ func (v Value) Compare(other Value) (int, bool) {
 	}
 
 	// Same kind - do value comparison
+	// none and undefined have a single value each, so they are equal to
+	// themselves
+	if k1 == kindOrder(KindUndefined) || k1 == kindOrder(KindNone) {
+		return 0, true
+	}
+
 	// Bool comparison
 	if b1, ok := v.AsBool(); ok {
 		if b2, ok := other.AsBool(); ok {
