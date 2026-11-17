@@ -193,13 +193,10 @@ fn should_lstrip_block(flag: bool, marker: StartMarker, prefix: &str) -> bool {
         // If we get here, we're at the start of the file
         return true;
     }
-    if matches!(
+    matches!(
         marker,
         StartMarker::LineStatement | StartMarker::LineComment
-    ) {
-        return true;
-    }
-    false
+    )
 }
 
 fn skip_basic_tag(
