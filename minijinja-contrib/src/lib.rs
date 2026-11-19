@@ -41,7 +41,7 @@ pub mod rand;
 pub fn add_to_environment(env: &mut Environment) {
     env.add_filter("pluralize", filters::pluralize);
     env.add_filter("filesizeformat", filters::filesizeformat);
-    env.add_filter("truncate", filters::truncate);
+    env.add_filter("truncate", filters::truncate_with_args);
     env.add_filter("striptags", filters::striptags);
     #[cfg(feature = "wordcount")]
     {
@@ -49,7 +49,7 @@ pub fn add_to_environment(env: &mut Environment) {
     }
     #[cfg(feature = "wordwrap")]
     {
-        env.add_filter("wordwrap", filters::wordwrap);
+        env.add_filter("wordwrap", filters::wordwrap_with_args);
     }
     #[cfg(feature = "datetime")]
     {
