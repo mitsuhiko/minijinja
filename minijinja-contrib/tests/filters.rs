@@ -208,6 +208,62 @@ fn test_truncate() {
 }
 
 #[test]
+fn test_truncate_positional_args() {
+    use minijinja::render;
+
+    const LONG_TEXT: &str =
+        "Lorem Ipsum is simply dummy text of the printing and typesetting industry.";
+    const SHORT_TEXT: &str = "Fifteen chars !";
+
+    // add_to_environment registers truncate with positional arguments in the
+    // order of Jinja2: length, killwords, end, leeway
+    let mut env = Environment::new();
+    minijinja_contrib::add_to_environment(&mut env);
+
+    insta::assert_snapshot!(
+        render!(in env, r"{{ text|truncate(10) }}", text=>LONG_TEXT),
+        @"Lorem..."
+    );
+    insta::assert_snapshot!(
+        render!(in env, r"{{ text|truncate(10, true) }}", text=>LONG_TEXT),
+        @"Lorem I..."
+    );
+    insta::assert_snapshot!(
+        render!(in env, r"{{ text|truncate(10, true, '') }}", text=>LONG_TEXT),
+        @"Lorem Ipsu"
+    );
+    insta::assert_snapshot!(
+        render!(in env, r"{{ text|truncate(10, false, '***', 0) }}", text=>SHORT_TEXT),
+        @"Fifteen***"
+    );
+    insta::assert_snapshot!(
+        render!(in env, r"{{ text|truncate(10, end='') }}", text=>LONG_TEXT),
+        @"Lorem"
+    );
+    insta::assert_snapshot!(
+        render!(in env, r"{{ text|truncate(10, none) }}", text=>LONG_TEXT),
+        @"Lorem..."
+    );
+    insta::assert_snapshot!(
+        render!(in env, r"{{ text|truncate(10, true, leeway=0) }}", text=>SHORT_TEXT),
+        @"Fifteen..."
+    );
+    insta::assert_snapshot!(
+        render!(in env, r"{{ text|truncate(length=10, killwords=true) }}", text=>LONG_TEXT),
+        @"Lorem I..."
+    );
+    assert!(env
+        .render_str(r"{{ 'hello'|truncate(10, length=20) }}", context! {})
+        .is_err());
+    assert!(env
+        .render_str(r"{{ 'hello'|truncate(10, true, '', 0, 1) }}", context! {})
+        .is_err());
+    assert!(env
+        .render_str(r"{{ none|truncate(10, true, '', 0, 1) }}", context! {})
+        .is_err());
+}
+
+#[test]
 fn test_truncate_preserves_and_composes_safety() {
     use minijinja::value::Kwargs;
     use minijinja_contrib::filters::truncate;
@@ -463,6 +519,65 @@ fn test_wordwrap() {
         .unwrap(),
         "ThisIsAVeryLongWordThatShouldBeBroken"
     );
+}
+
+#[test]
+#[cfg(feature = "wordwrap")]
+fn test_wordwrap_positional_args() {
+    // add_to_environment registers wordwrap with positional arguments in the
+    // order of Jinja2: width, break_long_words, wrapstring, break_on_hyphens
+    let mut env = Environment::new();
+    minijinja_contrib::add_to_environment(&mut env);
+
+    let render = |tmpl: &str, text: &str| env.render_str(tmpl, context! { text }).unwrap();
+    assert_eq!(
+        render(
+            "{{ text|wordwrap(20) }}",
+            "This is a long piece of text that should be wrapped at a specific width."
+        ),
+        "This is a long piece\nof text that should\nbe wrapped at a\nspecific width."
+    );
+    assert_eq!(
+        render(
+            "{{ text|wordwrap(10, false) }}",
+            "ThisIsAVeryLongWordThatShouldBeBroken"
+        ),
+        "ThisIsAVeryLongWordThatShouldBeBroken"
+    );
+    assert_eq!(
+        render(
+            "{{ text|wordwrap(10, true, '|') }}",
+            "ThisIsAVeryLongWordThatShouldBeBroken"
+        ),
+        "ThisIsAVer|yLongWordT|hatShouldB|eBroken"
+    );
+    assert_eq!(
+        render(
+            "{{ text|wordwrap(10, false, none, false) }}",
+            "This-is-a-hyphenated-word"
+        ),
+        "This-is-a-hyphenated-word"
+    );
+    assert_eq!(
+        render(
+            "{{ text|wordwrap(10, false, break_on_hyphens=false) }}",
+            "This-is-a-hyphenated-word"
+        ),
+        "This-is-a-hyphenated-word"
+    );
+    assert_eq!(
+        render(
+            "{{ text|wordwrap(width=10, break_long_words=false) }}",
+            "ThisIsAVeryLongWordThatShouldBeBroken"
+        ),
+        "ThisIsAVeryLongWordThatShouldBeBroken"
+    );
+    assert!(env
+        .render_str("{{ 'hello'|wordwrap(10, width=20) }}", context! {})
+        .is_err());
+    assert!(env
+        .render_str("{{ 'hello'|wordwrap(10, true, '', true, 1) }}", context! {})
+        .is_err());
 }
 
 #[test]
