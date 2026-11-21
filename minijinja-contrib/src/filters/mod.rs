@@ -427,7 +427,8 @@ pub fn striptags(s: String) -> String {
                     }
 
                     if cc == '<' {
-                        State::Tag
+                        // go through TagStart so `<!--` is still detected
+                        State::TagStart
                     } else if cc == '&' {
                         entity_buffer.clear();
                         State::Entity
