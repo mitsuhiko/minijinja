@@ -2277,7 +2277,7 @@ impl Iterator for ValueIter {
     fn size_hint(&self) -> (usize, Option<usize>) {
         match self.imp {
             ValueIterImpl::Empty => (0, Some(0)),
-            ValueIterImpl::Chars(_, len, _) => (0, Some(len)),
+            ValueIterImpl::Chars(_, len, _) => (len, Some(len)),
             ValueIterImpl::Dyn(ref iter) => iter.size_hint(),
         }
     }

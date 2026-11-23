@@ -526,6 +526,18 @@ fn test_safe_concat_uses_formatter() {
 }
 
 #[test]
+fn test_loop_over_string_knows_its_length() {
+    let env = Environment::new();
+    let rv = env
+        .render_str(
+            "{% for c in s %}{{ c }}:{{ loop.length }}:{{ loop.revindex }}:{{ loop.revindex0 }}:{{ loop.last }} {% endfor %}",
+            context!(s => "añb"),
+        )
+        .unwrap();
+    assert_eq!(rv, "a:3:3:2:False ñ:3:2:1:False b:3:1:0:True ");
+}
+
+#[test]
 fn test_loop_changed() {
     let rv = minijinja::render!(
         r#"

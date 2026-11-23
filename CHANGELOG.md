@@ -9,6 +9,7 @@ All notable changes to MiniJinja are documented here.
 * Fixed slicing and `range()` in Go panicking or giving wrong results for steps and bounds near the 64-bit integer limits, such as `[1, 2, 3][1::9223372036854775807]` or `range(9223372036854775807, -1, -4611686018427387904)`.
 * Fixed slicing with a step of `-9223372036854775808` and `range()` with bounds or steps near the 64-bit integer limits overflowing in Rust.  This panicked with overflow checks enabled, and without them `range(9223372036854775807, -1, -4611686018427387904)` failed with "range has too many elements" and `range(0, -5, -9223372036854775808)` was empty.  Slicing with a step of `4294967296` or more no longer panics on 32-bit targets such as WebAssembly.
 * Fixed a negative width panicking in the `indent` and `tojson` filters in Go.  Like in Rust, `indent(-1)` and `tojson(indent=-1)` now fail with "cannot convert number to usize", widths that are not integers such as `2.5` or `"x"` fail instead of being ignored, and `indent(true)` indents by one space.
+* Fixed `loop.length`, `loop.revindex`, `loop.revindex0` and `loop.last` when looping over a string in Rust.  The length was treated as unknown, so `loop.last` was always false and the others were undefined.
 
 ## 3.1.0
 
