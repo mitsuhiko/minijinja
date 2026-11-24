@@ -233,6 +233,21 @@ fn test_nested_macro_can_escape_invocation() {
 }
 
 #[test]
+fn test_macro_can_assign_to_enclosed_namespace() {
+    let rv = render!(
+        r#"
+        {% set ns = namespace(value=true) %}
+        {% macro mutate() %}
+            {% set ns.value = false %}
+        {% endmacro %}
+        {{ mutate() }}
+        {{ ns.value }}
+        "#
+    );
+    assert_eq!(rv.trim(), "False");
+}
+
+#[test]
 fn test_nested_macro_can_escape_into_state() {
     fn stash(state: &mut State, value: Value) -> &'static str {
         state.set_temp("macro", value);
