@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 
-use minijinja::value::{Kwargs, Value, ValueKind};
+use minijinja::value::{from_args, Kwargs, Rest, Value, ValueKind, ValueOrKwargs};
 use minijinja::State;
 use minijinja::{Error, ErrorKind};
 
@@ -151,7 +151,9 @@ pub fn filesizeformat(value: f64, binary: Option<bool>) -> String {
 /// {{ "Hello World"|truncate(length=5) }}
 /// ```
 ///
-/// The filter accepts a few keyword arguments:
+/// The filter accepts a few keyword arguments.  When registered through
+/// [`add_to_environment`](crate::add_to_environment) they can also be passed
+/// by position in this order, like in Jinja2:
 /// * `length`: maximum length of the output string (defaults to 255)
 /// * `killwords`: set to `true` if you want to cut text exactly at length; if `false`,
 ///   the filter will preserve last word (defaults to `false`)
@@ -182,6 +184,31 @@ pub fn filesizeformat(value: f64, binary: Option<bool>) -> String {
 /// ) }}
 /// ```
 pub fn truncate(state: &mut State, value: &Value, kwargs: Kwargs) -> Result<Value, Error> {
+    truncate_impl(state, value, None, None, None, None, kwargs)
+}
+
+/// The `truncate` filter as registered, which also accepts positional arguments.
+pub(crate) fn truncate_with_args(
+    state: &mut State,
+    value: &Value,
+    args: Rest<ValueOrKwargs>,
+) -> Result<Value, Error> {
+    let args = args.into_values();
+    // functions only support up to five arguments, so the positional
+    // arguments need manual argument parsing.
+    let (length, killwords, end, leeway, kwargs) = from_args(&args)?;
+    truncate_impl(state, value, length, killwords, end, leeway, kwargs)
+}
+
+fn truncate_impl(
+    state: &mut State,
+    value: &Value,
+    length: Option<usize>,
+    killwords: Option<bool>,
+    end: Option<&Value>,
+    leeway: Option<usize>,
+    kwargs: Kwargs,
+) -> Result<Value, Error> {
     if matches!(value.kind(), ValueKind::None | ValueKind::Undefined) {
         return Ok(Value::from(""));
     }
@@ -193,19 +220,31 @@ pub fn truncate(state: &mut State, value: &Value, kwargs: Kwargs) -> Result<Valu
         )
     })?;
 
-    let length = kwargs.get::<Option<usize>>("length")?.unwrap_or(255);
-    let killwords = kwargs.get::<Option<bool>>("killwords")?.unwrap_or_default();
+    let length = match length {
+        Some(length) => length,
+        None => kwargs.get::<Option<usize>>("length")?.unwrap_or(255),
+    };
+    let killwords = match killwords {
+        Some(killwords) => killwords,
+        None => kwargs.get::<Option<bool>>("killwords")?.unwrap_or_default(),
+    };
     let default_end = Value::from("...");
-    let end = kwargs.get::<Option<&Value>>("end")?.unwrap_or(&default_end);
+    let end = match end {
+        Some(end) => end,
+        None => kwargs.get::<Option<&Value>>("end")?.unwrap_or(&default_end),
+    };
     let end_str = end
         .as_str()
         .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "value is not a string"))?;
-    let leeway = kwargs.get::<Option<usize>>("leeway")?.unwrap_or_else(|| {
-        state
-            .lookup("TRUNCATE_LEEWAY")
-            .and_then(|x| usize::try_from(x.clone()).ok())
-            .unwrap_or(5)
-    });
+    let leeway = match leeway {
+        Some(leeway) => leeway,
+        None => kwargs.get::<Option<usize>>("leeway")?.unwrap_or_else(|| {
+            state
+                .lookup("TRUNCATE_LEEWAY")
+                .and_then(|x| usize::try_from(x.clone()).ok())
+                .unwrap_or(5)
+        }),
+    };
 
     kwargs.assert_all_used()?;
 
@@ -289,26 +328,69 @@ pub fn wordcount(value: &Value) -> Result<Value, Error> {
 /// feature is enabled (`unicode_wordwrap`) then it becomes so.  It's implemented on top of
 /// the `textwrap` crate.
 ///
-/// **Keyword arguments:**
+/// **Keyword arguments** (when registered through
+/// [`add_to_environment`](crate::add_to_environment) they can also be passed
+/// by position in this order, like in Jinja2):
 ///
 /// - `width`: Maximum length of wrapped lines (default: 79)
 /// - `break_long_words`: If a word is longer than width, break it across lines (default: true)
-/// - `break_on_hyphens`: If a word contains hyphens, it may be split across lines (default: true)
 /// - `wrapstring`: String to join each wrapped line (default: newline)
+/// - `break_on_hyphens`: If a word contains hyphens, it may be split across lines (default: true)
 #[cfg(feature = "wordwrap")]
 #[cfg_attr(docsrs, doc(any(cfg(feature = "wordwrap"), cfg = "unicode_wordwrap")))]
 pub fn wordwrap(value: &Value, kwargs: Kwargs) -> Result<Value, Error> {
+    wordwrap_impl(value, None, None, None, None, kwargs)
+}
+
+/// The `wordwrap` filter as registered, which also accepts positional arguments.
+#[cfg(feature = "wordwrap")]
+pub(crate) fn wordwrap_with_args(value: &Value, args: Rest<ValueOrKwargs>) -> Result<Value, Error> {
+    let args = args.into_values();
+    // functions only support up to five arguments, so the positional
+    // arguments need manual argument parsing.
+    let (width, break_long_words, wrapstring, break_on_hyphens, kwargs) = from_args(&args)?;
+    wordwrap_impl(
+        value,
+        width,
+        break_long_words,
+        wrapstring,
+        break_on_hyphens,
+        kwargs,
+    )
+}
+
+#[cfg(feature = "wordwrap")]
+fn wordwrap_impl(
+    value: &Value,
+    width: Option<usize>,
+    break_long_words: Option<bool>,
+    wrapstring: Option<&str>,
+    break_on_hyphens: Option<bool>,
+    kwargs: Kwargs,
+) -> Result<Value, Error> {
     use textwrap::{wrap, Options as WrapOptions, WordSplitter};
     let s = value.as_str().unwrap_or_default();
 
-    let width = kwargs.get::<Option<usize>>("width")?.unwrap_or(79);
-    let break_long_words = kwargs
-        .get::<Option<bool>>("break_long_words")?
-        .unwrap_or(true);
-    let break_on_hyphens = kwargs
-        .get::<Option<bool>>("break_on_hyphens")?
-        .unwrap_or(true);
-    let wrapstring = kwargs.get::<Option<&str>>("wrapstring")?.unwrap_or("\n");
+    let width = match width {
+        Some(width) => width,
+        None => kwargs.get::<Option<usize>>("width")?.unwrap_or(79),
+    };
+    let break_long_words = match break_long_words {
+        Some(break_long_words) => break_long_words,
+        None => kwargs
+            .get::<Option<bool>>("break_long_words")?
+            .unwrap_or(true),
+    };
+    let wrapstring = match wrapstring {
+        Some(wrapstring) => wrapstring,
+        None => kwargs.get::<Option<&str>>("wrapstring")?.unwrap_or("\n"),
+    };
+    let break_on_hyphens = match break_on_hyphens {
+        Some(break_on_hyphens) => break_on_hyphens,
+        None => kwargs
+            .get::<Option<bool>>("break_on_hyphens")?
+            .unwrap_or(true),
+    };
     kwargs.assert_all_used()?;
 
     let mut options = WrapOptions::new(width);
