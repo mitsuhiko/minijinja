@@ -80,6 +80,18 @@ fn test_string_methods() {
     assert!(eval_expr("'abcbd'.split('b', 1) == ['a', 'cbd']").is_true());
     assert!(eval_expr("'a\\nb\\r\\nc'.splitlines() == ['a', 'b', 'c']").is_true());
     assert!(eval_expr("'a\\nb\\r\\nc'.splitlines(true) == ['a\\n', 'b\\r\\n', 'c']").is_true());
+    assert!(eval_expr("'a\\rb\\r'.splitlines() == ['a', 'b']").is_true());
+    assert!(eval_expr("'a\\rb\\r'.splitlines(true) == ['a\\r', 'b\\r']").is_true());
+    assert!(
+        eval_expr("'a\\x0bb\\x0cc\\x1cd\\x85e'.splitlines() == ['a', 'b', 'c', 'd', 'e']")
+            .is_true()
+    );
+    assert!(
+        eval_expr("'a\\u2028b\\u2029\\n'.splitlines(true) == ['a\\u2028', 'b\\u2029', '\\n']")
+            .is_true()
+    );
+    assert!(eval_expr("'\\n\\r\\n'.splitlines() == ['', '']").is_true());
+    assert!(eval_expr("''.splitlines() == []").is_true());
     assert!(eval_expr("'foobarbaz'.startswith('foo')").is_true());
     assert!(eval_expr("'foobarbaz'.startswith(('foo', 'bar'))").is_true());
     assert!(!eval_expr("'barfoobaz'.startswith(('foo', 'baz'))").is_true());

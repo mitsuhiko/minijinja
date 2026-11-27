@@ -195,20 +195,31 @@ fn string_methods(
         }
         "splitlines" => {
             let (keepends,): (Option<bool>,) = from_args(args)?;
-            if !keepends.unwrap_or(false) {
-                Ok(s.lines().map(Value::from).collect())
-            } else {
-                let mut rv = Vec::new();
-                let mut rest = s;
-                while let Some(offset) = rest.find('\n') {
-                    rv.push(Value::from(&rest[..offset + 1]));
-                    rest = &rest[offset + 1..];
+            let keepends = keepends.unwrap_or(false);
+            let mut rv = Vec::new();
+            let mut start = 0;
+            let mut chars = s.char_indices().peekable();
+            while let Some((offset, c)) = chars.next() {
+                // the same line boundaries as Python's str.splitlines
+                let mut end = offset + c.len_utf8();
+                match c {
+                    '\r' => {
+                        if let Some(&(_, '\n')) = chars.peek() {
+                            chars.next();
+                            end += 1;
+                        }
+                    }
+                    '\n' | '\x0b' | '\x0c' | '\x1c' | '\x1d' | '\x1e' | '\u{85}' | '\u{2028}'
+                    | '\u{2029}' => {}
+                    _ => continue,
                 }
-                if !rest.is_empty() {
-                    rv.push(Value::from(rest));
-                }
-                Ok(Value::from(rv))
+                rv.push(Value::from(&s[start..if keepends { end } else { offset }]));
+                start = end;
             }
+            if start < s.len() {
+                rv.push(Value::from(&s[start..]));
+            }
+            Ok(Value::from(rv))
         }
         "capitalize" => {
             let () = from_args(args)?;
