@@ -723,6 +723,28 @@ fn test_undeclared_variables() {
 }
 
 #[test]
+fn test_undeclared_attribute_assignment_base() {
+    let mut env = Environment::new();
+    env.add_template(
+        "demo",
+        r#"
+        {% macro mutate() %}
+            {% set local = false %}
+            {% set ns.value = false %}
+        {% endmacro %}
+        "#,
+    )
+    .unwrap();
+    let tmpl = env.get_template("demo").unwrap();
+    let expected = ["ns"].into_iter().map(|x| x.to_string()).collect();
+    assert_eq!(tmpl.undeclared_variables(false), expected);
+    assert_eq!(
+        tmpl.undeclared_variables(true),
+        ["ns"].into_iter().map(|x| x.to_string()).collect()
+    );
+}
+
+#[test]
 fn test_undeclared_variables_bug() {
     // see https://github.com/mitsuhiko/minijinja/issues/484
     let mut env = Environment::new();

@@ -4,6 +4,7 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Fixed a macro failing with "can only assign to namespaces, not undefined" in Rust when it assigns to an attribute of a namespace from the enclosing scope that it does not otherwise read, such as `{% set ns.value = false %}`.  Like in Jinja2 and Go, the namespace is now captured by the macro, and `undeclared_variables` reports `ns` for such an assignment.
 * Fixed the `striptags` filter not recognizing an HTML comment that directly follows an unterminated entity, such as `AT&T<!-- a > b -->`, which leaked the rest of the comment into the output.
 * Fixed comparing `none` with `none` or undefined with undefined failing with "cannot compare" in Go.  Like in Rust, they are equal, so `none < none` is false and `none <= none` is true.
 * Fixed slicing and `range()` in Go ignoring arguments that are not integers.  Like in Rust, `[1, 2, 3][1.5:]`, `[1, 2, 3]["a":]` and `range(1.5)` now fail with "cannot convert number to i64" (or `isize` for `range`) instead of ignoring the bound, undefined slice bounds fail instead of being ignored, booleans count as 0 and 1, `range(none)`, `range()`, `range()` with keyword arguments and `range()` with more than three arguments fail, and floats beyond the 64-bit range are no longer converted to `-9223372036854775808`.  The errors for a step of 0 now match Rust as well.

@@ -205,6 +205,7 @@ fn track_assign<'a>(expr: &ast::Expr<'a>, state: &mut AssignmentTracker<'a>) {
         ast::Expr::Var(var) => state.assign(var.id),
         ast::Expr::List(list) => list.items.iter().for_each(|x| track_assign(x, state)),
         ast::Expr::Tuple(tuple) => tuple.items.iter().for_each(|x| track_assign(x, state)),
+        ast::Expr::GetAttr(attr) => tracker_visit_expr(&attr.expr, state),
         _ => {}
     }
 }
