@@ -372,9 +372,11 @@ impl<'source> CodeGenerator<'source> {
                 self.set_line_from_span(auto_escape.span());
                 self.compile_expr(&auto_escape.enabled);
                 self.add(Instruction::PushAutoEscape);
+                self.add(Instruction::PushWith);
                 for node in &auto_escape.body {
                     self.compile_stmt(node);
                 }
+                self.add(Instruction::PopFrame);
                 self.add(Instruction::PopAutoEscape);
             }
             ast::Stmt::FilterBlock(filter_block) => {

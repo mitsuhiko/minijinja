@@ -14,6 +14,17 @@ fn test_state_lookup_global() {
     assert_eq!(rv, "[True]");
 }
 
+#[test]
+fn test_auto_escape_scopes_assignments() {
+    let output = Environment::new()
+        .render_str(
+            "{% set x = 1 %}{% autoescape true %}{% set x = 2 %}{% set nested = 3 %}{{ x }}:{{ nested }}{% endautoescape %}|{{ x }}:{{ nested is undefined }}",
+            (),
+        )
+        .unwrap();
+    assert_eq!(output, "2:3|1:True");
+}
+
 #[cfg(feature = "multi_template")]
 #[test]
 fn test_state_temps() {
