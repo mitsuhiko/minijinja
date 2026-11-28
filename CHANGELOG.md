@@ -4,6 +4,7 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Fixed the `urlencode` filter percent-encoding `~` as `%7E` in Rust.  Like in Jinja2 and Go, `~` is now kept as is, as it is one of the unreserved URL characters next to `-`, `.` and `_`.
 * The `truncate` and `wordwrap` filters in `minijinja-contrib` now also accept their arguments by position for Jinja2 compatibility, so `truncate(10)` and `wordwrap(40)` no longer fail with "too many arguments".  The positional order is the one of Jinja2: `length`, `killwords`, `end`, `leeway` for `truncate` and `width`, `break_long_words`, `wrapstring`, `break_on_hyphens` for `wordwrap`.  This applies to the filters registered by `add_to_environment`; the public `truncate` and `wordwrap` functions keep taking keyword arguments only.
 * Fixed a macro failing with "can only assign to namespaces, not undefined" in Rust when it assigns to an attribute of a namespace from the enclosing scope that it does not otherwise read, such as `{% set ns.value = false %}`.  Like in Jinja2 and Go, the namespace is now captured by the macro, and `undeclared_variables` reports `ns` for such an assignment.
 * Fixed the `striptags` filter not recognizing an HTML comment that directly follows an unterminated entity, such as `AT&T<!-- a > b -->`, which leaked the rest of the comment into the output.
