@@ -14,6 +14,37 @@ fn test_state_lookup_global() {
     assert_eq!(rv, "[True]");
 }
 
+#[test]
+fn test_auto_escape_scopes_assignments() {
+    let output = Environment::new()
+        .render_str(
+            "{% set x = 1 %}{% autoescape true %}{% set x = 2 %}{% set nested = 3 %}{{ x }}:{{ nested }}{% endautoescape %}|{{ x }}:{{ nested is undefined }}",
+            (),
+        )
+        .unwrap();
+    assert_eq!(output, "2:3|1:True");
+}
+
+#[cfg(feature = "loop_controls")]
+#[test]
+fn test_loop_control_unwinds_auto_escape() {
+    let env = Environment::new();
+    for (control, expected) in [("break", "0|outer|<"), ("continue", "01|outer|<")] {
+        for (open, close) in [
+            ("", ""),
+            (
+                "{% with %}{% set discarded %}{% filter upper %}discarded",
+                "{% endfilter %}{% endset %}{% endwith %}",
+            ),
+        ] {
+            let template = format!(
+                "{{% set x = 'outer' %}}{{% for i in [0, 1] %}}{{{{ i }}}}{{% autoescape true %}}{{% set x = 'inner' %}}{open}{{% {control} %}}{close}{{% endautoescape %}}{{% endfor %}}|{{{{ x }}}}|{{{{ '<' }}}}"
+            );
+            assert_eq!(env.render_str(&template, ()).unwrap(), expected);
+        }
+    }
+}
+
 #[cfg(feature = "multi_template")]
 #[test]
 fn test_state_temps() {
