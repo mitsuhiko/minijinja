@@ -688,6 +688,9 @@ func TestIndentAndTojsonWidthArguments(t *testing.T) {
 		{`{{ "a\nb"|indent(none) }}`, "a\n    b"},
 		{`{{ "a\nb"|indent(true) }}`, "a\n b"},
 		{`{{ "a\nb"|indent(2.0) }}`, "a\n  b"},
+		// Like in Jinja2, a string is used as the indentation.
+		{`{{ "a\nb"|indent("x") }}`, "a\nxb"},
+		{`{{ "a\nb"|indent(width="x", first=true) }}`, "xa\nxb"},
 		{`{{ [1]|tojson(indent=none) }}`, "[1]"},
 		{`{{ [1]|tojson(indent=2) }}`, "[\n  1\n]"},
 	} {
@@ -712,7 +715,6 @@ func TestIndentAndTojsonWidthArguments(t *testing.T) {
 		{`{{ "a\nb"|indent(-1) }}`, "cannot convert number to usize"},
 		{`{{ "a\nb"|indent(width=-1) }}`, "cannot convert number to usize"},
 		{`{{ "a\nb"|indent(2.5) }}`, "cannot convert number to usize"},
-		{`{{ "a\nb"|indent("x") }}`, "cannot convert string to usize"},
 		{`{{ [1]|tojson(-1) }}`, "cannot convert number to usize"},
 		{`{{ [1]|tojson(indent=-1) }}`, "cannot convert number to usize"},
 		{`{{ [1]|tojson(indent="x") }}`, "cannot convert string to usize"},
