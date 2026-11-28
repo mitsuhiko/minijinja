@@ -4,6 +4,7 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Fixed the integer conversions of the `format` filter in Go.  `%i` printed Go's `%!i(int64=3)` error text instead of the number, `%#o` printed `03` instead of `0o3`, zero padding of `%#x` and `%#o` did not count the prefix, a precision turned off zero padding, and booleans failed with "invalid format spec".  Like in Rust and Python, `"%i|%#o|%#06x|%d"|format(3, 8, 255, true)` now gives `3|0o10|0x00ff|1`.
 * The `truncate` and `wordwrap` filters in `minijinja-contrib` now also accept their arguments by position for Jinja2 compatibility, so `truncate(10)` and `wordwrap(40)` no longer fail with "too many arguments".  The positional order is the one of Jinja2: `length`, `killwords`, `end`, `leeway` for `truncate` and `width`, `break_long_words`, `wrapstring`, `break_on_hyphens` for `wordwrap`.  This applies to the filters registered by `add_to_environment`; the public `truncate` and `wordwrap` functions keep taking keyword arguments only.
 * Fixed a macro failing with "can only assign to namespaces, not undefined" in Rust when it assigns to an attribute of a namespace from the enclosing scope that it does not otherwise read, such as `{% set ns.value = false %}`.  Like in Jinja2 and Go, the namespace is now captured by the macro, and `undeclared_variables` reports `ns` for such an assignment.
 * Fixed the `striptags` filter not recognizing an HTML comment that directly follows an unterminated entity, such as `AT&T<!-- a > b -->`, which leaked the rest of the comment into the output.

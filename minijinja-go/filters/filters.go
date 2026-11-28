@@ -790,10 +790,18 @@ func formatPrintfValue(val value.Value, flags, width, precision string, verb byt
 		}
 		return padding + charStr, nil
 	case 'd', 'i', 'o', 'x', 'X':
-		if i, ok := val.AsInt(); ok {
-			return fmt.Sprintf(format, i), nil
+		i, ok := val.AsInt()
+		if !ok && val.Kind() == value.KindBool {
+			b, _ := val.AsBool()
+			if b {
+				i = 1
+			}
+			ok = true
 		}
-		return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("invalid format spec at offset %d", location))
+		if !ok {
+			return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("invalid format spec at offset %d", location))
+		}
+		return formatPrintfInt(i, flags, parseFormatNumber(width), parseFormatNumber(precision), verb, location)
 	case 'e', 'E', 'f', 'F', 'g', 'G':
 		if f, ok := val.AsFloat(); ok {
 			return fmt.Sprintf(format, f), nil
@@ -804,6 +812,58 @@ func formatPrintfValue(val value.Value, flags, width, precision string, verb byt
 		return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("invalid format spec at offset %d", location))
 	default:
 		return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("invalid format spec at offset %d", location))
+	}
+}
+
+const maxFormatPadding = 1e7
+
+func formatPrintfInt(i int64, flags string, width, precision int, verb byte, location int) (string, error) {
+	if width > maxFormatPadding || precision > maxFormatPadding {
+		return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("format spec at offset %d is too large", location))
+	}
+	base, prefix := 10, ""
+	switch verb {
+	case 'o':
+		base, prefix = 8, "0o"
+	case 'x':
+		base, prefix = 16, "0x"
+	case 'X':
+		base, prefix = 16, "0X"
+	}
+	if !strings.Contains(flags, "#") {
+		prefix = ""
+	}
+
+	magnitude := uint64(i)
+	sign := ""
+	switch {
+	case i < 0:
+		magnitude = -magnitude
+		sign = "-"
+	case strings.Contains(flags, "+"):
+		sign = "+"
+	case strings.Contains(flags, " "):
+		sign = " "
+	}
+
+	digits := strconv.FormatUint(magnitude, base)
+	if verb == 'X' {
+		digits = strings.ToUpper(digits)
+	}
+	if len(digits) < precision {
+		digits = strings.Repeat("0", precision-len(digits)) + digits
+	}
+
+	padding := width - len(sign) - len(prefix) - len(digits)
+	switch {
+	case padding <= 0:
+		return sign + prefix + digits, nil
+	case strings.Contains(flags, "-"):
+		return sign + prefix + digits + strings.Repeat(" ", padding), nil
+	case strings.Contains(flags, "0"):
+		return sign + prefix + strings.Repeat("0", padding) + digits, nil
+	default:
+		return strings.Repeat(" ", padding) + sign + prefix + digits, nil
 	}
 }
 
