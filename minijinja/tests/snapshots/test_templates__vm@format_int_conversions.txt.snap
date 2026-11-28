@@ -1,0 +1,11 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "i: {{ \"%i|%5i|%-5i|%05i|%+i\"|format(3, 3, 3, 3, 3) }}\nnamed: {{ \"%(n)i items\"|format(n=4) }}\noctal: {{ \"%#o|%#5o|%#06o|%-#6o|%+#o\"|format(8, 8, -8, 8, 8) }}\nhex: {{ \"%#06x|%#06X|%-#6x|% #x\"|format(255, -255, 255, 255) }}\nbool: {{ \"%d|%i|%x|%#o\"|format(true, true, false, true) }}"
+info: {}
+input_file: minijinja/tests/inputs/format_int_conversions.txt
+---
+i: 3|    3|3    |00003|+3
+named: 4 items
+octal: 0o10| 0o10|-0o010|0o10  |+0o10
+hex: 0x00ff|-0X0FF|0xff  | 0xff
+bool: 1|1|0|0o1

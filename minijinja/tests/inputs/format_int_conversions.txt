@@ -1,0 +1,7 @@
+{}
+---
+i: {{ "%i|%5i|%-5i|%05i|%+i"|format(3, 3, 3, 3, 3) }}
+named: {{ "%(n)i items"|format(n=4) }}
+octal: {{ "%#o|%#5o|%#06o|%-#6o|%+#o"|format(8, 8, -8, 8, 8) }}
+hex: {{ "%#06x|%#06X|%-#6x|% #x"|format(255, -255, 255, 255) }}
+bool: {{ "%d|%i|%x|%#o"|format(true, true, false, true) }}
