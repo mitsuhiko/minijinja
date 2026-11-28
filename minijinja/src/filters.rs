@@ -2049,6 +2049,7 @@ mod builtins {
             .remove(b'.')
             .remove(b'-')
             .remove(b'_')
+            .remove(b'~')
             .add(b' ');
 
         if value.kind() == ValueKind::Map {
