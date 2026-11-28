@@ -3546,6 +3546,9 @@ func FilterAttr(_ State, val value.Value, args []value.Value, kwargs map[string]
 // Parameters can also be provided as keyword arguments for Jinja2 compatibility:
 // width, first, and blank.
 //
+// Like in Jinja2, the width can also be a string, which is then used to indent
+// the lines instead of spaces.
+//
 // Example:
 //
 //	env := minijinja.NewEnvironment()
@@ -3558,6 +3561,7 @@ func FilterAttr(_ State, val value.Value, args []value.Value, kwargs map[string]
 //	{{ yaml_content|indent(2, true) }}
 //	{{ yaml_content|indent(2, true, true) }}
 //	{{ yaml_content|indent(width=4, first=true, blank=false) }}
+//	{{ quoted_text|indent("> ", true) }}
 func FilterIndent(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	s, err := stringInput(state, val)
 	if err != nil {
@@ -3565,6 +3569,8 @@ func FilterIndent(state State, val value.Value, args []value.Value, kwargs map[s
 	}
 
 	width := 4
+	indent := ""
+	hasIndent := false
 	widthArg, hasWidth := value.Undefined(), false
 	if len(args) > 0 {
 		widthArg, hasWidth = args[0], true
@@ -3573,11 +3579,17 @@ func FilterIndent(state State, val value.Value, args []value.Value, kwargs map[s
 		delete(kwargs, "width")
 	}
 	if hasWidth && !widthArg.IsNone() && !widthArg.IsUndefined() {
-		w, err := usizeArg(widthArg)
-		if err != nil {
-			return value.Undefined(), err
+		// Like in Jinja2, a string width is used as the indentation itself.
+		if str, ok := widthArg.AsString(); ok {
+			indent, hasIndent = str, true
+			width = len(str)
+		} else {
+			w, err := usizeArg(widthArg)
+			if err != nil {
+				return value.Undefined(), err
+			}
+			width = w
 		}
-		width = w
 	}
 
 	first := false
@@ -3616,7 +3628,9 @@ func FilterIndent(state State, val value.Value, args []value.Value, kwargs map[s
 			return value.Undefined(), err
 		}
 	}
-	indent := strings.Repeat(" ", width)
+	if !hasIndent {
+		indent = strings.Repeat(" ", width)
+	}
 	lines := strings.Split(s, "\n")
 	for i, line := range lines {
 		if i == 0 && !first {

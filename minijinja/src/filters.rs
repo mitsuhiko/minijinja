@@ -1933,6 +1933,16 @@ mod builtins {
     /// ```jinja
     /// {{ global_config|indent(width=4, first=true, blank=false) }}
     /// ```
+    ///
+    /// Like in Jinja2, the width can also be a string, which is then used to
+    /// indent the lines instead of spaces:
+    ///
+    /// ```jinja
+    /// {{ quoted_text|indent("> ", true) }}
+    /// ```
+    ///
+    /// When called directly from Rust, the positional width is always a
+    /// number of spaces.
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins"))))]
     pub fn indent(
         value: StringInput<'_>,
@@ -1944,7 +1954,7 @@ mod builtins {
         indent_impl(
             None,
             value,
-            width,
+            width.map(Value::from),
             indent_first_line,
             indent_blank_lines,
             kwargs,
@@ -1957,7 +1967,7 @@ mod builtins {
         // to be accompanied by manual argument parsing.
         let (value, width, indent_first_line, indent_blank_lines, kwargs): (
             StringInput<'_>,
-            Option<usize>,
+            Option<Value>,
             Option<bool>,
             Option<bool>,
             Kwargs,
@@ -1975,7 +1985,7 @@ mod builtins {
     fn indent_impl(
         state: Option<&State>,
         value: StringInput<'_>,
-        width: Option<usize>,
+        width: Option<Value>,
         indent_first_line: Option<bool>,
         indent_blank_lines: Option<bool>,
         kwargs: Kwargs,
@@ -1991,8 +2001,8 @@ mod builtins {
         }
 
         let width = match width {
-            Some(width) => width,
-            None => ok!(kwargs.get::<Option<usize>>("width")).unwrap_or(4),
+            Some(width) => Some(width),
+            None => ok!(kwargs.get::<Option<Value>>("width")),
         };
         let indent_first_line = match indent_first_line {
             Some(value) => value,
@@ -2004,12 +2014,26 @@ mod builtins {
         };
         ok!(kwargs.assert_all_used());
 
+        // Like in Jinja2, a string width is used as the indentation itself.
+        let indent_str = width
+            .as_ref()
+            .filter(|width| width.kind() == ValueKind::String)
+            .and_then(|width| width.as_str());
+        let width = match (indent_str, width.as_ref()) {
+            (Some(indent_str), _) => indent_str.len(),
+            (None, Some(width)) => ok!(usize::try_from(width.clone())),
+            (None, None) => 4,
+        };
+
         let input = strip_trailing_newline(value.as_str());
         if let Some(state) = state {
             let lines = input.bytes().filter(|&b| b == b'\n').count() + 1;
             ok!(state.ensure_bytes(width.saturating_mul(lines).saturating_add(input.len())));
         }
-        let indent_with = " ".repeat(width);
+        let indent_with = match indent_str {
+            Some(indent_str) => Cow::Borrowed(indent_str),
+            None => Cow::Owned(" ".repeat(width)),
+        };
         let mut output = String::new();
         let mut iterator = input.split('\n');
         if !indent_first_line {
