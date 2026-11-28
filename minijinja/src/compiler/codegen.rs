@@ -47,8 +47,7 @@ fn compare_op(op: ast::CompareOpKind) -> CompareOp {
     }
 }
 
-/// Represents an open block of code that does not yet have updated
-/// jump targets.
+/// Represents an open block of code with unresolved jumps or exit cleanup.
 enum PendingBlock {
     Branch {
         jump_instr: u32,
@@ -60,6 +59,8 @@ enum PendingBlock {
     ScBool {
         jump_instrs: Vec<u32>,
     },
+    #[cfg(feature = "loop_controls")]
+    Cleanup(&'static [Instruction<'static>]),
 }
 
 const CODEGEN_POOL_MAX_ITEMS: usize = 64;
@@ -346,9 +347,7 @@ impl<'source> CodeGenerator<'source> {
                     self.compile_expr(expr);
                     self.compile_assignment(target);
                 }
-                for node in &with_block.body {
-                    self.compile_stmt(node);
-                }
+                self.compile_scoped_body(&with_block.body, &[Instruction::PopFrame]);
                 self.add(Instruction::PopFrame);
             }
             ast::Stmt::Set(set) => {
@@ -359,9 +358,10 @@ impl<'source> CodeGenerator<'source> {
             ast::Stmt::SetBlock(set_block) => {
                 self.set_line_from_span(set_block.span());
                 self.add(Instruction::BeginCapture(CaptureMode::Capture));
-                for node in &set_block.body {
-                    self.compile_stmt(node);
-                }
+                self.compile_scoped_body(
+                    &set_block.body,
+                    &[Instruction::EndCapture, Instruction::DiscardTop],
+                );
                 self.add(Instruction::EndCapture);
                 if let Some(ref filter) = set_block.filter {
                     self.compile_expr(filter);
@@ -373,18 +373,20 @@ impl<'source> CodeGenerator<'source> {
                 self.compile_expr(&auto_escape.enabled);
                 self.add(Instruction::PushAutoEscape);
                 self.add(Instruction::PushWith);
-                for node in &auto_escape.body {
-                    self.compile_stmt(node);
-                }
+                self.compile_scoped_body(
+                    &auto_escape.body,
+                    &[Instruction::PopFrame, Instruction::PopAutoEscape],
+                );
                 self.add(Instruction::PopFrame);
                 self.add(Instruction::PopAutoEscape);
             }
             ast::Stmt::FilterBlock(filter_block) => {
                 self.set_line_from_span(filter_block.span());
                 self.add(Instruction::BeginCapture(CaptureMode::Capture));
-                for node in &filter_block.body {
-                    self.compile_stmt(node);
-                }
+                self.compile_scoped_body(
+                    &filter_block.body,
+                    &[Instruction::EndCapture, Instruction::DiscardTop],
+                );
                 self.add(Instruction::EndCapture);
                 self.compile_expr(&filter_block.filter);
                 self.add_with_span(Instruction::Emit, filter_block.filter_span);
@@ -442,25 +444,20 @@ impl<'source> CodeGenerator<'source> {
             #[cfg(feature = "loop_controls")]
             ast::Stmt::Continue(cont) => {
                 self.set_line_from_span(cont.span());
-                for pending_block in self.pending_block.iter().rev() {
-                    if let PendingBlock::Loop { iter_instr, .. } = pending_block {
-                        self.add(Instruction::Jump(*iter_instr));
-                        break;
+                if let Some(index) = self.unwind_to_loop() {
+                    if let PendingBlock::Loop { iter_instr, .. } = self.pending_block[index] {
+                        self.add(Instruction::Jump(iter_instr));
                     }
                 }
             }
             #[cfg(feature = "loop_controls")]
             ast::Stmt::Break(brk) => {
                 self.set_line_from_span(brk.span());
+                let target_loop = self.unwind_to_loop();
                 let instr = self.add(Instruction::Jump(0));
-                for pending_block in self.pending_block.iter_mut().rev() {
-                    if let &mut PendingBlock::Loop {
-                        ref mut jump_instrs,
-                        ..
-                    } = pending_block
-                    {
+                if let Some(index) = target_loop {
+                    if let PendingBlock::Loop { jump_instrs, .. } = &mut self.pending_block[index] {
                         jump_instrs.push(instr);
-                        break;
                     }
                 }
             }
@@ -468,6 +465,36 @@ impl<'source> CodeGenerator<'source> {
                 self.compile_do(do_tag);
             }
         }
+    }
+
+    fn compile_scoped_body(
+        &mut self,
+        body: &[ast::Stmt<'source>],
+        _cleanup: &'static [Instruction<'static>],
+    ) {
+        #[cfg(feature = "loop_controls")]
+        self.pending_block.push(PendingBlock::Cleanup(_cleanup));
+        for node in body {
+            self.compile_stmt(node);
+        }
+        #[cfg(feature = "loop_controls")]
+        self.pending_block.pop();
+    }
+
+    #[cfg(feature = "loop_controls")]
+    fn unwind_to_loop(&mut self) -> Option<usize> {
+        let target = self
+            .pending_block
+            .iter()
+            .rposition(|block| matches!(block, PendingBlock::Loop { .. }))?;
+        for index in (target + 1..self.pending_block.len()).rev() {
+            if let PendingBlock::Cleanup(cleanup) = self.pending_block[index] {
+                for instr in cleanup {
+                    self.add(instr.clone());
+                }
+            }
+        }
+        Some(target)
     }
 
     #[cfg(feature = "multi_template")]
